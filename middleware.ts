@@ -13,6 +13,32 @@ export function middleware(request: NextRequest): NextResponse {
   const username = process.env.SIFTLY_USERNAME?.trim()
   const password = process.env.SIFTLY_PASSWORD?.trim()
 
+  // Keep anonymous cloud deployments browse-only so public visitors cannot mutate data.
+  if (process.env.VERCEL === '1' && (!username || !password)) {
+    const pathname = request.nextUrl.pathname
+    const migrationToken = process.env.MIGRATION_TOKEN
+    const migrationRequest =
+      pathname === '/api/admin/migrate' &&
+      migrationToken &&
+      request.headers.get('Authorization') === `Bearer ${migrationToken}`
+
+    if (migrationRequest) return NextResponse.next()
+
+    const adminPage = ['/settings', '/import', '/categorize'].some(
+      (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+    )
+    const adminApi = ['/api/settings', '/api/import', '/api/categorize'].some(
+      (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+    )
+
+    if (adminPage) {
+      return NextResponse.redirect(new URL('/bookmarks', request.url))
+    }
+    if (adminApi || !['GET', 'HEAD', 'OPTIONS'].includes(request.method)) {
+      return NextResponse.json({ error: 'Public deployment is read-only' }, { status: 403 })
+    }
+  }
+
   // No credentials configured → pass through (default local behaviour)
   if (!username || !password) return NextResponse.next()
 
