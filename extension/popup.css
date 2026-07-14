@@ -1,0 +1,11 @@
+:root { color-scheme: dark; font-family: Georgia, 'Times New Roman', serif; }
+body { margin: 0; min-width: 290px; background: #071012; color: #ecfeff; }
+main { padding: 20px; background: radial-gradient(circle at top right, #164e63 0, transparent 44%); }
+.eyebrow { color: #67e8f9; font: 700 10px/1.2 ui-monospace, monospace; letter-spacing: .2em; }
+h1 { margin: 6px 0 14px; font-size: 24px; font-weight: 500; }
+p { margin: 0 0 7px; color: #a5f3fc; font: 13px/1.4 ui-sans-serif, sans-serif; }
+#details { min-height: 34px; color: #94a3b8; }
+button, a { display: block; box-sizing: border-box; width: 100%; border-radius: 10px; text-align: center; font: 700 13px/1 ui-sans-serif, sans-serif; }
+button { margin-top: 14px; padding: 11px; border: 0; background: #22d3ee; color: #082f49; cursor: pointer; }
+button:disabled { cursor: wait; opacity: .65; }
+a { margin-top: 8px; padding: 10px; color: #cbd5e1; text-decoration: none; border: 1px solid #334155; }

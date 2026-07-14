@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useRef, useEffect, useState } from 'react'
-import { ExternalLink, Download, FileText, Play, Pencil, X, Check, ImageOff, Bookmark, Globe } from 'lucide-react'
+import { ExternalLink, Download, FileText, Play, Pencil, X, Check, ImageOff, Bookmark, Globe, ChevronDown, ChevronUp } from 'lucide-react'
 import type { BookmarkWithMedia, Category } from '@/lib/types'
 
 // ── URL helpers ────────────────────────────────────────────────────────────────
@@ -580,11 +580,12 @@ function CategoryEditor({ bookmarkId, currentCategoryIds, onSave, onClose }: Cat
 
 interface BookmarkCardProps {
   bookmark: BookmarkWithMedia
+  defaultExpanded?: boolean
 }
 
-export default function BookmarkCard({ bookmark }: BookmarkCardProps) {
+export default function BookmarkCard({ bookmark, defaultExpanded = false }: BookmarkCardProps) {
   const [categories, setCategories] = useState(bookmark.categories)
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(defaultExpanded)
   const [editingCategories, setEditingCategories] = useState(false)
 
   const tweetUrl = (bookmark.authorHandle && bookmark.authorHandle !== 'unknown')
@@ -762,31 +763,33 @@ export default function BookmarkCard({ bookmark }: BookmarkCardProps) {
         {/* Tweet text */}
         <div className={`flex-1 ${previewUrl && !displayText ? '' : 'min-h-[4.5rem]'}`}>
           {displayText.length > 0 && (
-            <p className="text-sm text-zinc-200 leading-relaxed">
+            <p className="text-sm text-zinc-200 leading-relaxed whitespace-pre-wrap">
               {displayText}
-              {isLong && !expanded && (
-                <span>
-                  {'… '}
-                  <button
-                    onClick={() => setExpanded(true)}
-                    className="text-indigo-400 hover:text-indigo-300 transition-colors"
-                  >
-                    more
-                  </button>
-                </span>
-              )}
-              {isLong && expanded && (
-                <span>
-                  {' '}
-                  <button
-                    onClick={() => setExpanded(false)}
-                    className="text-zinc-500 hover:text-zinc-400 transition-colors text-xs"
-                  >
-                    less
-                  </button>
-                </span>
-              )}
+              {isLong && !expanded ? '...' : ''}
             </p>
+          )}
+          {isLong && (
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setExpanded((value) => !value)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-1.5 text-xs font-semibold text-cyan-300 hover:border-cyan-400/60 hover:bg-cyan-500/15 transition-colors"
+                aria-expanded={expanded}
+              >
+                {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                {expanded ? 'Show less' : 'Read more'}
+              </button>
+              {expanded && (
+                <a
+                  href={tweetUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+                >
+                  Open full post or thread on X <ExternalLink size={11} />
+                </a>
+              )}
+            </div>
           )}
           {!displayText && !firstMedia && !previewUrl && (
             <p className="text-xs text-zinc-700 italic">No text content</p>

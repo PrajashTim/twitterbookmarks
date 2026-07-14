@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Siftly Bookmark Sync",
+  "version": "1.0.0",
+  "description": "Keeps your private Siftly library in sync with X bookmarks.",
+  "permissions": ["alarms", "storage", "tabs"],
+  "host_permissions": [
+    "https://x.com/*",
+    "https://twitter.com/*",
+    "https://twitterbookmarks.vercel.app/*"
+  ],
+  "background": { "service_worker": "service-worker.js" },
+  "action": {
+    "default_title": "Siftly Bookmark Sync",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://x.com/i/bookmarks*", "https://twitter.com/i/bookmarks*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

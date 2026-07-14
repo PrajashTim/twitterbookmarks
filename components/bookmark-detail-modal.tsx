@@ -40,7 +40,7 @@ export default function BookmarkDetailModal({ bookmark, onClose }: BookmarkDetai
         >
           <X size={18} />
         </button>
-        <BookmarkCard bookmark={bookmark} />
+        <BookmarkCard bookmark={bookmark} defaultExpanded />
       </div>
     </div>
   )

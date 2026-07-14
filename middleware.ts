@@ -16,6 +16,14 @@ export function middleware(request: NextRequest): NextResponse {
   // Keep anonymous cloud deployments browse-only so public visitors cannot mutate data.
   if (process.env.VERCEL === '1' && (!username || !password)) {
     const pathname = request.nextUrl.pathname
+    const syncToken = process.env.BOOKMARK_SYNC_TOKEN
+    const syncRequest =
+      pathname === '/api/sync/bookmarks' &&
+      syncToken &&
+      request.headers.get('Authorization') === `Bearer ${syncToken}`
+
+    if (syncRequest) return NextResponse.next()
+
     const adminPage = ['/settings', '/import', '/categorize'].some(
       (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
     )

@@ -70,3 +70,6 @@ promo-video/
 *.swp
 *.swo
 *~
+
+# Local Chrome extension credentials
+extension/config.local.js
