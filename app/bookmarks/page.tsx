@@ -5,10 +5,6 @@ import { useSearchParams } from 'next/navigation'
 import {
   Search,
   BookmarkX,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
   LayoutGrid,
   List,
   AlignJustify,
@@ -33,7 +29,6 @@ interface Filters {
   mediaType: string
   source: string
   sort: string
-  page: number
   uncategorized: boolean
   randomSeed: string
 }
@@ -44,12 +39,11 @@ const DEFAULT_FILTERS: Filters = {
   mediaType: '',
   source: '',
   sort: 'newest',
-  page: 1,
   uncategorized: false,
   randomSeed: '',
 }
 
-function buildUrl(filters: Filters, limit: number, random = false): string {
+function buildUrl(filters: Filters, limit: number, page = 1, random = false): string {
   const params = new URLSearchParams()
   if (filters.q) params.set('q', filters.q)
   if (filters.uncategorized) {
@@ -60,7 +54,7 @@ function buildUrl(filters: Filters, limit: number, random = false): string {
   if (filters.mediaType) params.set('mediaType', filters.mediaType)
   if (filters.source) params.set('source', filters.source)
   params.set('sort', filters.sort)
-  params.set('page', String(filters.page))
+  params.set('page', String(page))
   params.set('limit', String(limit))
   if (filters.sort === 'random' && filters.randomSeed) params.set('seed', filters.randomSeed)
   if (random) params.set('random', 'true')
@@ -139,75 +133,6 @@ function SkeletonCard() {
   )
 }
 
-function Pagination({
-  page,
-  total,
-  limit,
-  onChange,
-}: {
-  page: number
-  total: number
-  limit: number
-  onChange: (p: number) => void
-}) {
-  const totalPages = Math.ceil(total / limit)
-  const [jumpValue, setJumpValue] = useState('')
-
-  if (totalPages <= 1) return null
-
-  function handleJumpKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key !== 'Enter') return
-    const num = parseInt(jumpValue, 10)
-    if (!isNaN(num) && num >= 1 && num <= totalPages) {
-      onChange(num)
-    }
-    setJumpValue('')
-  }
-
-  const navBtnClass =
-    'flex items-center justify-center w-9 h-9 rounded-xl text-sm bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-100 hover:border-zinc-700 hover:bg-zinc-800 disabled:opacity-25 disabled:cursor-not-allowed transition-all'
-
-  return (
-    <div className="flex items-center justify-center gap-3 mt-12">
-      {/* Jump to page */}
-      <div className="flex items-center gap-2">
-        <span className="text-sm text-zinc-500 select-none">Jump to page</span>
-        <input
-          type="number"
-          min={1}
-          max={totalPages}
-          value={jumpValue}
-          onChange={(e) => setJumpValue(e.target.value)}
-          onKeyDown={handleJumpKeyDown}
-          placeholder="—"
-          className="w-14 px-2 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-100 placeholder:text-zinc-700 text-sm text-center focus:outline-none focus:border-indigo-500/60 focus:ring-1 focus:ring-indigo-500/20 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-        />
-      </div>
-
-      {/* Page indicator */}
-      <span className="text-sm text-zinc-600 select-none tabular-nums">
-        Page <span className="text-zinc-400">{page}</span> of <span className="text-zinc-400">{totalPages}</span>
-      </span>
-
-      {/* Navigation arrows */}
-      <div className="flex items-center gap-1">
-        <button onClick={() => onChange(1)} disabled={page <= 1} className={navBtnClass} title="First page">
-          <ChevronsLeft size={14} />
-        </button>
-        <button onClick={() => onChange(page - 1)} disabled={page <= 1} className={navBtnClass} title="Previous page">
-          <ChevronLeft size={14} />
-        </button>
-        <button onClick={() => onChange(page + 1)} disabled={page >= totalPages} className={navBtnClass} title="Next page">
-          <ChevronRight size={14} />
-        </button>
-        <button onClick={() => onChange(totalPages)} disabled={page >= totalPages} className={navBtnClass} title="Last page">
-          <ChevronsRight size={14} />
-        </button>
-      </div>
-    </div>
-  )
-}
-
 function BookmarksPageInner() {
   const searchParams = useSearchParams()
   const [filters, setFilters] = useState<Filters>(() => ({
@@ -221,49 +146,116 @@ function BookmarksPageInner() {
   const [bookmarks, setBookmarks] = useState<BookmarkWithMedia[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [loadMoreError, setLoadMoreError] = useState(false)
+  const [loadedPage, setLoadedPage] = useState(0)
   const [randomLoading, setRandomLoading] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'compact'>('grid')
   const [openBookmark, setOpenBookmark] = useState<BookmarkWithMedia | null>(null)
   const searchRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  const fetchBookmarks = useCallback(async (f: Filters, limit: number) => {
-    setLoading(true)
-    try {
-      const res = await fetch(buildUrl(f, limit))
-      if (!res.ok) throw new Error('Failed to fetch')
-      const data: BookmarksResponse = await res.json()
-      setBookmarks(data.bookmarks)
-      setTotal(data.total)
-    } catch (err) {
-      console.error(err)
-      setBookmarks([])
-      setTotal(0)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  const loadMoreRef = useRef<HTMLDivElement | null>(null)
+  const loadMoreControllerRef = useRef<AbortController | null>(null)
 
   const pageSize = viewMode === 'compact' ? COMPACT_PAGE_SIZE : DEFAULT_PAGE_SIZE
 
   useEffect(() => {
-    fetchBookmarks(filters, pageSize)
-  }, [fetchBookmarks, filters, pageSize])
+    const controller = new AbortController()
+    loadMoreControllerRef.current?.abort()
+    setLoading(true)
+    setLoadingMore(false)
+    setLoadMoreError(false)
+    setBookmarks([])
+    setTotal(0)
+    setLoadedPage(0)
+
+    async function fetchFirstPage() {
+      try {
+        const res = await fetch(buildUrl(filters, pageSize), { signal: controller.signal })
+        if (!res.ok) throw new Error('Failed to fetch')
+        const data: BookmarksResponse = await res.json()
+        setBookmarks(data.bookmarks)
+        setTotal(data.total)
+        setLoadedPage(1)
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return
+        console.error(err)
+        setBookmarks([])
+        setTotal(0)
+      } finally {
+        if (!controller.signal.aborted) setLoading(false)
+      }
+    }
+
+    fetchFirstPage()
+    return () => controller.abort()
+  }, [filters, pageSize])
+
+  const hasMore = bookmarks.length < total
+
+  const loadMore = useCallback(async () => {
+    if (loading || loadingMore || !hasMore || loadedPage < 1 || loadMoreControllerRef.current) return
+
+    const controller = new AbortController()
+    loadMoreControllerRef.current = controller
+    const nextPage = loadedPage + 1
+    setLoadingMore(true)
+    setLoadMoreError(false)
+
+    try {
+      const res = await fetch(buildUrl(filters, pageSize, nextPage), { signal: controller.signal })
+      if (!res.ok) throw new Error('Failed to fetch more bookmarks')
+      const data: BookmarksResponse = await res.json()
+      setBookmarks((current) => {
+        const existingIds = new Set(current.map((bookmark) => bookmark.id))
+        return [...current, ...data.bookmarks.filter((bookmark) => !existingIds.has(bookmark.id))]
+      })
+      setTotal(data.total)
+      setLoadedPage(nextPage)
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return
+      console.error(err)
+      setLoadMoreError(true)
+    } finally {
+      if (loadMoreControllerRef.current === controller) {
+        setLoadingMore(false)
+        loadMoreControllerRef.current = null
+      }
+    }
+  }, [filters, hasMore, loadedPage, loading, loadingMore, pageSize])
+
+  useEffect(() => {
+    const sentinel = loadMoreRef.current
+    if (!sentinel || !hasMore) return
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !loadMoreError) loadMore()
+      },
+      { rootMargin: '800px 0px' }
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [hasMore, loadMore, loadMoreError])
+
+  useEffect(() => () => {
+    if (searchRef.current) clearTimeout(searchRef.current)
+    loadMoreControllerRef.current?.abort()
+  }, [])
 
   function handleSetViewMode(mode: 'grid' | 'list' | 'compact') {
     setViewMode(mode)
-    setFilters((prev) => ({ ...prev, page: 1 }))
   }
 
   function updateSearch(q: string) {
     setSearchInput(q)
     if (searchRef.current) clearTimeout(searchRef.current)
     searchRef.current = setTimeout(() => {
-      setFilters((prev) => ({ ...prev, q, page: 1 }))
+      setFilters((prev) => ({ ...prev, q }))
     }, 300)
   }
 
   function updateFilter<K extends keyof Filters>(key: K, value: Filters[K]) {
-    setFilters((prev) => ({ ...prev, [key]: value, page: 1 }))
+    setFilters((prev) => ({ ...prev, [key]: value }))
   }
 
   function clearAllFilters() {
@@ -276,14 +268,13 @@ function BookmarksPageInner() {
       ...prev,
       sort: 'random',
       randomSeed: crypto.randomUUID(),
-      page: 1,
     }))
   }
 
   async function showRandomBookmark() {
     setRandomLoading(true)
     try {
-      const res = await fetch(buildUrl({ ...filters, page: 1 }, 1, true))
+      const res = await fetch(buildUrl(filters, 1, 1, true))
       if (!res.ok) throw new Error('Failed to pick a bookmark')
       const data: BookmarksResponse = await res.json()
       setOpenBookmark(data.bookmarks[0] ?? null)
@@ -364,7 +355,6 @@ function BookmarksPageInner() {
                 ...prev,
                 sort: prev.sort === 'newest' ? 'oldest' : 'newest',
                 randomSeed: '',
-                page: 1,
               }))}
               className="flex min-h-10 items-center gap-2 px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-sm text-zinc-400 hover:border-zinc-700 hover:text-zinc-200 transition-all shrink-0"
               title={`Sort: ${sortLabel}`}
@@ -536,7 +526,9 @@ function BookmarksPageInner() {
         {!loading && bookmarks.length > 0 && viewMode === 'list' && (
           <div className="flex flex-col gap-3 max-w-3xl mx-auto">
             {bookmarks.map((bookmark) => (
-              <BookmarkCard key={bookmark.id} bookmark={bookmark} />
+              <div key={bookmark.id} className="bookmark-virtual-item">
+                <BookmarkCard bookmark={bookmark} />
+              </div>
             ))}
           </div>
         )}
@@ -546,7 +538,9 @@ function BookmarksPageInner() {
           <>
             <div className="hidden sm:flex flex-col divide-y divide-zinc-800/50 border border-zinc-800 rounded-2xl overflow-hidden max-w-5xl mx-auto">
               {bookmarks.map((bookmark) => (
-                <BookmarkRow key={bookmark.id} bookmark={bookmark} onClick={setOpenBookmark} />
+                <div key={bookmark.id} className="bookmark-virtual-item">
+                  <BookmarkRow bookmark={bookmark} onClick={setOpenBookmark} />
+                </div>
               ))}
             </div>
             <div className="sm:hidden masonry-grid">
@@ -559,12 +553,37 @@ function BookmarksPageInner() {
           </>
         )}
 
-        <Pagination
-          page={filters.page}
-          total={total}
-          limit={pageSize}
-          onChange={(p) => setFilters((prev) => ({ ...prev, page: p }))}
-        />
+        {!loading && bookmarks.length > 0 && (
+          <div ref={loadMoreRef} className="flex min-h-28 items-center justify-center pt-8" aria-live="polite">
+            {hasMore ? (
+              <button
+                type="button"
+                onClick={loadMore}
+                disabled={loadingMore}
+                className="group flex min-h-11 items-center gap-3 rounded-2xl border border-zinc-800 bg-zinc-900/80 px-5 py-2.5 text-sm text-zinc-400 transition-all hover:border-cyan-500/40 hover:text-zinc-200 disabled:cursor-wait disabled:opacity-70"
+              >
+                <span className="flex items-center gap-1" aria-hidden="true">
+                  {[0, 1, 2].map((dot) => (
+                    <span
+                      key={dot}
+                      className={`h-1.5 w-1.5 rounded-full bg-cyan-400 ${loadingMore ? 'animate-pulse' : 'group-hover:animate-pulse'}`}
+                      style={{ animationDelay: `${dot * 120}ms` }}
+                    />
+                  ))}
+                </span>
+                {loadingMore
+                  ? 'Loading more bookmarks'
+                  : loadMoreError
+                    ? 'Could not load more - click to retry'
+                    : `Keep scrolling - ${bookmarks.length.toLocaleString()} of ${total.toLocaleString()} loaded`}
+              </button>
+            ) : (
+              <p className="text-sm text-zinc-600">
+                All {total.toLocaleString()} bookmarks loaded
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {openBookmark && (

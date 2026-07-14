@@ -68,6 +68,13 @@ body {
   min-width: 0;
   display: flex;
   flex-direction: column;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 420px;
+}
+
+.bookmark-virtual-item {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 240px;
 }
 
 /* ── Scrollbar styling ────────────────────────────────────────────────────── */
