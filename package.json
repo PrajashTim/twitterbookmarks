@@ -15,7 +15,6 @@
     "lint": "eslint",
     "test": "vitest run",
     "classify:local": "node scripts/classify-local.mjs",
-    "migrate:cloud": "node scripts/migrate-sqlite-to-postgres.mjs",
     "siftly": "tsx cli/siftly.ts"
   },
   "dependencies": {

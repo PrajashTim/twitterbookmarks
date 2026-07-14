@@ -16,14 +16,6 @@ export function middleware(request: NextRequest): NextResponse {
   // Keep anonymous cloud deployments browse-only so public visitors cannot mutate data.
   if (process.env.VERCEL === '1' && (!username || !password)) {
     const pathname = request.nextUrl.pathname
-    const migrationToken = process.env.MIGRATION_TOKEN
-    const migrationRequest =
-      pathname === '/api/admin/migrate' &&
-      migrationToken &&
-      request.headers.get('Authorization') === `Bearer ${migrationToken}`
-
-    if (migrationRequest) return NextResponse.next()
-
     const adminPage = ['/settings', '/import', '/categorize'].some(
       (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
     )
