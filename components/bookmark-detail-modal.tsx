@@ -30,7 +30,7 @@ export default function BookmarkDetailModal({ bookmark, onClose }: BookmarkDetai
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-xl mx-auto mt-16 mb-16 px-4"
+        className="relative w-full max-w-xl mx-auto mt-12 sm:mt-16 mb-24 sm:mb-16 px-2 sm:px-4"
         onClick={(e) => e.stopPropagation()}
       >
         <button

@@ -32,6 +32,13 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
 
+const MOBILE_NAV_ITEMS: NavItem[] = [
+  { href: '/', label: 'Home', icon: LayoutDashboard },
+  { href: '/bookmarks', label: 'Browse', icon: Search },
+  { href: '/categories', label: 'Collections', icon: Tag },
+  { href: '/mindmap', label: 'Mindmap', icon: GitBranch },
+]
+
 const BUILDER_X = 'https://x.com/viperr'
 
 function SponsorFooter() {
@@ -154,7 +161,27 @@ export default function Nav() {
   const visibleCats = showAllCats ? categories : categories.slice(0, 8)
 
   return (
-    <aside className="flex flex-col bg-zinc-900 border-r border-zinc-800/50 shrink-0 sticky top-0 h-screen overflow-y-auto" style={{ width: '228px' }}>
+    <>
+      <header className="md:hidden fixed inset-x-0 top-0 z-40 h-14 flex items-center justify-between border-b border-zinc-800/80 bg-zinc-950/95 px-3 backdrop-blur-xl">
+        <Link href="/" className="flex items-center gap-2" aria-label="Siftly home">
+          <img src="/logo.svg" alt="" className="h-8 w-8" />
+          <span className="text-zinc-100 font-bold tracking-tight">
+            Sift<span className="text-amber-400">ly</span>
+          </span>
+        </Link>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={openSearch}
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900 text-zinc-400"
+            aria-label="Search"
+          >
+            <Search size={16} />
+          </button>
+          <ThemeToggle />
+        </div>
+      </header>
+
+      <aside className="hidden md:flex flex-col bg-zinc-900 border-r border-zinc-800/50 shrink-0 sticky top-0 h-screen overflow-y-auto" style={{ width: '228px' }}>
 
       {/* Brand */}
       <div className="flex items-center justify-center gap-3 px-4 py-3.5 border-b border-zinc-800/50">
@@ -298,6 +325,25 @@ export default function Nav() {
       )}
 
       <SponsorFooter />
-    </aside>
+      </aside>
+
+      <nav className="md:hidden fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-zinc-800/80 bg-zinc-950/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl">
+        {MOBILE_NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+          const active = isActive(pathname, href)
+          return (
+            <Link
+              key={href}
+              href={href}
+              className={`flex min-w-0 flex-col items-center gap-1 rounded-xl px-1 py-1.5 text-[10px] font-medium transition-colors ${
+                active ? 'bg-blue-500/12 text-blue-400' : 'text-zinc-500'
+              }`}
+            >
+              <Icon size={17} />
+              <span className="truncate max-w-full">{label}</span>
+            </Link>
+          )
+        })}
+      </nav>
+    </>
   )
 }

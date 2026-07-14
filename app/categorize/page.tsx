@@ -134,7 +134,7 @@ export default function CategorizePage() {
   const currentStageInfo = status?.stage ? STAGE_INFO[status.stage] : null
 
   return (
-    <div className="p-8 max-w-xl mx-auto">
+    <div className="p-4 sm:p-6 md:p-8 max-w-xl mx-auto">
       <div className="mb-8">
         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-medium mb-4">
           <Sparkles size={12} /> AI Categorization

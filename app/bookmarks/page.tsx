@@ -80,7 +80,7 @@ function SelectMenu({
 }) {
   return (
     <Select.Root value={value || '_all'} onValueChange={(v) => onChange(v === '_all' ? '' : v)}>
-      <Select.Trigger className="flex items-center gap-2 px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-sm text-zinc-400 hover:border-zinc-700 hover:text-zinc-200 focus:outline-none focus:border-indigo-500 transition-all min-w-[120px] shrink-0">
+      <Select.Trigger className="flex min-h-10 items-center gap-2 px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-sm text-zinc-400 hover:border-zinc-700 hover:text-zinc-200 focus:outline-none focus:border-indigo-500 transition-all min-w-[112px] sm:min-w-[120px] shrink-0">
         <Select.Value placeholder={placeholder} />
         <Select.Icon className="ml-auto">
           <ChevronDown size={12} className="text-zinc-600" />
@@ -317,9 +317,9 @@ function BookmarksPageInner() {
     <div className="flex flex-col h-full">
 
       {/* ── Sticky top bar ── */}
-      <div className="sticky top-0 z-20 bg-zinc-950/90 backdrop-blur-lg border-b border-zinc-800/60">
-        <div className="px-6 md:px-8 py-4">
-          <div className="flex items-center gap-3">
+      <div className="md:sticky md:top-0 z-20 bg-zinc-950/90 backdrop-blur-lg border-b border-zinc-800/60">
+        <div className="px-3 sm:px-6 md:px-8 py-3 sm:py-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
 
             {/* Search */}
             <div className="relative flex-1">
@@ -341,6 +341,7 @@ function BookmarksPageInner() {
               )}
             </div>
 
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
             {/* Filters */}
             <SelectMenu
               value={filters.mediaType}
@@ -365,7 +366,7 @@ function BookmarksPageInner() {
                 randomSeed: '',
                 page: 1,
               }))}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-sm text-zinc-400 hover:border-zinc-700 hover:text-zinc-200 transition-all shrink-0"
+              className="flex min-h-10 items-center gap-2 px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-sm text-zinc-400 hover:border-zinc-700 hover:text-zinc-200 transition-all shrink-0"
               title={`Sort: ${sortLabel}`}
             >
               <ArrowUpDown size={13} />
@@ -375,7 +376,7 @@ function BookmarksPageInner() {
             <button
               onClick={shuffleOrder}
               disabled={loading || total === 0}
-              className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0 ${
+              className={`flex min-h-10 items-center gap-2 px-3 py-2 rounded-xl border text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0 ${
                 filters.sort === 'random'
                   ? 'bg-cyan-400 border-cyan-300 text-zinc-950'
                   : 'bg-zinc-900 border-zinc-800 text-cyan-300 hover:border-cyan-500/50'
@@ -389,7 +390,7 @@ function BookmarksPageInner() {
             <button
               onClick={showRandomBookmark}
               disabled={loading || total === 0 || randomLoading}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-400 text-zinc-950 text-sm font-semibold hover:bg-amber-300 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0 shadow-[0_0_24px_rgba(251,191,36,0.14)]"
+              className="flex min-h-10 items-center gap-2 px-3 py-2 rounded-xl bg-amber-400 text-zinc-950 text-sm font-semibold hover:bg-amber-300 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0 shadow-[0_0_24px_rgba(251,191,36,0.14)]"
               title="Pick a random bookmark from the current filters"
             >
               <Shuffle size={13} className={randomLoading ? 'animate-spin' : ''} />
@@ -418,13 +419,14 @@ function BookmarksPageInner() {
               </button>
               <button
                 onClick={() => handleSetViewMode('compact')}
-                className={`p-1.5 rounded-lg transition-all ${
+                className={`hidden sm:block p-1.5 rounded-lg transition-all ${
                   viewMode === 'compact' ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-600 hover:text-zinc-300'
                 }`}
                 aria-label="Compact view"
               >
                 <AlignJustify size={14} />
               </button>
+            </div>
             </div>
 
           </div>
@@ -471,7 +473,7 @@ function BookmarksPageInner() {
       </div>
 
       {/* ── Content ── */}
-      <div className="flex-1 px-6 md:px-8 py-6 max-w-7xl mx-auto w-full">
+      <div className="flex-1 px-3 sm:px-6 md:px-8 py-4 sm:py-6 max-w-7xl mx-auto w-full">
 
         {/* Results count */}
         {!loading && (
@@ -541,11 +543,20 @@ function BookmarksPageInner() {
 
         {/* Compact view */}
         {!loading && bookmarks.length > 0 && viewMode === 'compact' && (
-          <div className="flex flex-col divide-y divide-zinc-800/50 border border-zinc-800 rounded-2xl overflow-hidden max-w-5xl mx-auto">
-            {bookmarks.map((bookmark) => (
-              <BookmarkRow key={bookmark.id} bookmark={bookmark} onClick={setOpenBookmark} />
-            ))}
-          </div>
+          <>
+            <div className="hidden sm:flex flex-col divide-y divide-zinc-800/50 border border-zinc-800 rounded-2xl overflow-hidden max-w-5xl mx-auto">
+              {bookmarks.map((bookmark) => (
+                <BookmarkRow key={bookmark.id} bookmark={bookmark} onClick={setOpenBookmark} />
+              ))}
+            </div>
+            <div className="sm:hidden masonry-grid">
+              {bookmarks.map((bookmark) => (
+                <div key={bookmark.id} className="masonry-item">
+                  <BookmarkCard bookmark={bookmark} />
+                </div>
+              ))}
+            </div>
+          </>
         )}
 
         <Pagination

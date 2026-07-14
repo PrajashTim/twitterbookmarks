@@ -118,7 +118,7 @@ export default function CategoryPage() {
 
   if (loading && !data) {
     return (
-      <div className="p-8 max-w-7xl mx-auto">
+      <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto">
         <div className="h-8 w-48 bg-zinc-800 rounded animate-pulse mb-4" />
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -134,7 +134,7 @@ export default function CategoryPage() {
   const total = data?.total ?? 0
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto">
       <button
         onClick={() => router.push('/categories')}
         className="flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-300 transition-colors mb-6"
