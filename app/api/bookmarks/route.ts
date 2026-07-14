@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/db'
+import { orderIdsBySeed, pickRandomOffset } from '@/lib/random'
 
 const DEFAULT_PAGE = 1
 const DEFAULT_LIMIT = 24
@@ -39,6 +40,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const mediaType = searchParams.get('mediaType')?.trim() ?? ''
   const uncategorized = searchParams.get('uncategorized') === 'true'
   const sortParam = searchParams.get('sort')?.trim() ?? 'newest'
+  const randomSeed = searchParams.get('seed')?.slice(0, 64) ?? ''
+  const random = searchParams.get('random') === 'true'
   const page = parseIntParam(searchParams.get('page'), DEFAULT_PAGE)
   const limit = Math.min(parseIntParam(searchParams.get('limit'), DEFAULT_LIMIT), MAX_LIMIT)
   const skip = (page - 1) * limit
@@ -71,6 +74,80 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
+    if (random) {
+      const total = await prisma.bookmark.count({ where })
+      if (total === 0) {
+        return NextResponse.json({ bookmarks: [], total, page: 1, limit: 1 })
+      }
+
+      const bookmark = await prisma.bookmark.findFirst({
+        where,
+        skip: pickRandomOffset(total),
+        include: {
+          mediaItems: true,
+          categories: {
+            include: {
+              category: {
+                select: {
+                  id: true,
+                  name: true,
+                  slug: true,
+                  color: true,
+                },
+              },
+            },
+          },
+        },
+      })
+
+      if (!bookmark) {
+        return NextResponse.json({ bookmarks: [], total, page: 1, limit: 1 })
+      }
+
+      return NextResponse.json({
+        bookmarks: [formatBookmark(bookmark)],
+        total,
+        page: 1,
+        limit: 1,
+      })
+    }
+
+    if (sortParam === 'random') {
+      const [idRows, total] = await Promise.all([
+        prisma.bookmark.findMany({ where, select: { id: true } }),
+        prisma.bookmark.count({ where }),
+      ])
+      const pageIds = orderIdsBySeed(idRows.map((row) => row.id), randomSeed)
+        .slice(skip, skip + limit)
+
+      const pageBookmarks = pageIds.length === 0
+        ? []
+        : await prisma.bookmark.findMany({
+            where: { ...where, id: { in: pageIds } },
+            include: {
+              mediaItems: true,
+              categories: {
+                include: {
+                  category: {
+                    select: { id: true, name: true, slug: true, color: true },
+                  },
+                },
+              },
+            },
+          })
+      const bookmarkById = new Map(pageBookmarks.map((bookmark) => [bookmark.id, bookmark]))
+
+      return NextResponse.json({
+        bookmarks: pageIds
+          .map((id) => bookmarkById.get(id))
+          .filter((bookmark): bookmark is NonNullable<typeof bookmark> => Boolean(bookmark))
+          .map(formatBookmark),
+        total,
+        page,
+        limit,
+      })
+    }
+
     const [bookmarks, total] = await Promise.all([
       prisma.bookmark.findMany({
         where,
@@ -96,29 +173,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       prisma.bookmark.count({ where }),
     ])
 
-    const formatted = bookmarks.map((bookmark) => ({
-      id: bookmark.id,
-      tweetId: bookmark.tweetId,
-      text: bookmark.text,
-      authorHandle: bookmark.authorHandle,
-      authorName: bookmark.authorName,
-      source: bookmark.source,
-      tweetCreatedAt: bookmark.tweetCreatedAt?.toISOString() ?? null,
-      importedAt: bookmark.importedAt.toISOString(),
-      mediaItems: bookmark.mediaItems.map((m) => ({
-        id: m.id,
-        type: m.type,
-        url: m.url,
-        thumbnailUrl: m.thumbnailUrl,
-      })),
-      categories: bookmark.categories.map((bc) => ({
-        id: bc.category.id,
-        name: bc.category.name,
-        slug: bc.category.slug,
-        color: bc.category.color,
-        confidence: bc.confidence,
-      })),
-    }))
+    const formatted = bookmarks.map(formatBookmark)
 
     return NextResponse.json({
       bookmarks: formatted,
@@ -132,5 +187,47 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       { error: `Failed to fetch bookmarks: ${err instanceof Error ? err.message : String(err)}` },
       { status: 500 }
     )
+  }
+}
+
+interface BookmarkRecord {
+  id: string
+  tweetId: string
+  text: string
+  authorHandle: string
+  authorName: string
+  source: string
+  tweetCreatedAt: Date | null
+  importedAt: Date
+  mediaItems: { id: string; type: string; url: string; thumbnailUrl: string | null }[]
+  categories: {
+    confidence: number
+    category: { id: string; name: string; slug: string; color: string }
+  }[]
+}
+
+function formatBookmark(bookmark: BookmarkRecord) {
+  return {
+    id: bookmark.id,
+    tweetId: bookmark.tweetId,
+    text: bookmark.text,
+    authorHandle: bookmark.authorHandle,
+    authorName: bookmark.authorName,
+    source: bookmark.source,
+    tweetCreatedAt: bookmark.tweetCreatedAt?.toISOString() ?? null,
+    importedAt: bookmark.importedAt.toISOString(),
+    mediaItems: bookmark.mediaItems.map((media) => ({
+      id: media.id,
+      type: media.type,
+      url: media.url,
+      thumbnailUrl: media.thumbnailUrl,
+    })),
+    categories: bookmark.categories.map((bookmarkCategory) => ({
+      id: bookmarkCategory.category.id,
+      name: bookmarkCategory.category.name,
+      slug: bookmarkCategory.category.slug,
+      color: bookmarkCategory.category.color,
+      confidence: bookmarkCategory.confidence,
+    })),
   }
 }

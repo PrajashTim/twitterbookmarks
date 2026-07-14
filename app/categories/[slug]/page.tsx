@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ChevronLeft, ChevronRight, Download, ArrowLeft } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, ArrowLeft, Shuffle, Dices } from 'lucide-react'
 import BookmarkCard from '@/components/bookmark-card'
+import BookmarkDetailModal from '@/components/bookmark-detail-modal'
 import type { BookmarkWithMedia, Category } from '@/lib/types'
 
 const PAGE_SIZE = 24
@@ -54,13 +55,18 @@ export default function CategoryPage() {
   const [data, setData] = useState<CategoryPageData | null>(null)
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
+  const [randomLoading, setRandomLoading] = useState(false)
+  const [randomBookmark, setRandomBookmark] = useState<BookmarkWithMedia | null>(null)
+  const [randomSeed, setRandomSeed] = useState('')
 
   const fetchData = useCallback(async (p: number) => {
     setLoading(true)
     try {
       const [catRes, bookmarksRes] = await Promise.all([
         fetch(`/api/categories/${slug}`),
-        fetch(`/api/bookmarks?category=${slug}&page=${p}&limit=${PAGE_SIZE}`),
+        fetch(`/api/bookmarks?category=${slug}&page=${p}&limit=${PAGE_SIZE}${
+          randomSeed ? `&sort=random&seed=${encodeURIComponent(randomSeed)}` : ''
+        }`),
       ])
 
       if (!catRes.ok) {
@@ -81,7 +87,7 @@ export default function CategoryPage() {
     } finally {
       setLoading(false)
     }
-  }, [slug, router])
+  }, [slug, router, randomSeed])
 
   useEffect(() => {
     fetchData(page)
@@ -89,6 +95,25 @@ export default function CategoryPage() {
 
   function handleExport() {
     window.location.href = `/api/export?type=zip&category=${slug}`
+  }
+
+  function shuffleOrder() {
+    setRandomSeed(crypto.randomUUID())
+    setPage(1)
+  }
+
+  async function showRandomBookmark() {
+    setRandomLoading(true)
+    try {
+      const response = await fetch(`/api/bookmarks?category=${encodeURIComponent(slug)}&random=true&limit=1`)
+      if (!response.ok) throw new Error('Failed to pick a bookmark')
+      const result = await response.json() as { bookmarks?: BookmarkWithMedia[] }
+      setRandomBookmark(result.bookmarks?.[0] ?? null)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setRandomLoading(false)
+    }
   }
 
   if (loading && !data) {
@@ -133,13 +158,36 @@ export default function CategoryPage() {
               <p className="text-zinc-500 text-sm mt-1">{total.toLocaleString()} bookmark{total !== 1 ? 's' : ''}</p>
             </div>
           </div>
-          <button
-            onClick={handleExport}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-medium transition-colors shrink-0"
-          >
-            <Download size={15} />
-            Export ZIP
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={shuffleOrder}
+              disabled={total === 0 || loading}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-colors ${
+                randomSeed
+                  ? 'bg-cyan-400 border-cyan-300 text-zinc-950'
+                  : 'bg-zinc-800 border-zinc-700 text-cyan-300 hover:border-cyan-500/50'
+              }`}
+              title="Shuffle this category until you refresh"
+            >
+              <Dices size={15} />
+              Random
+            </button>
+            <button
+              onClick={showRandomBookmark}
+              disabled={total === 0 || randomLoading}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-zinc-950 text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-[0_0_24px_rgba(251,191,36,0.14)]"
+            >
+              <Shuffle size={15} className={randomLoading ? 'animate-spin' : ''} />
+              Surprise me
+            </button>
+            <button
+              onClick={handleExport}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-medium transition-colors"
+            >
+              <Download size={15} />
+              Export ZIP
+            </button>
+          </div>
         </div>
       )}
 
@@ -166,6 +214,13 @@ export default function CategoryPage() {
       )}
 
       <Pagination page={page} total={total} limit={PAGE_SIZE} onChange={setPage} />
+
+      {randomBookmark && (
+        <BookmarkDetailModal
+          bookmark={randomBookmark}
+          onClose={() => setRandomBookmark(null)}
+        />
+      )}
     </div>
   )
 }

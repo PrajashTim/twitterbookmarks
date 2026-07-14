@@ -39,6 +39,7 @@ function LinkPreview({ url, tweetUrl, tweetId, prominent = false }: { url: strin
   useEffect(() => {
     const cacheKey = tweetId ? `${url}:${tweetId}` : url
     if (previewCache.has(cacheKey)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Reuse a previously resolved preview without another request.
       setData(previewCache.get(cacheKey) ?? null)
       return
     }

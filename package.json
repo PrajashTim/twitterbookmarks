@@ -13,6 +13,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "classify:local": "node scripts/classify-local.mjs",
     "siftly": "tsx cli/siftly.ts"
   },
   "dependencies": {

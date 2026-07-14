@@ -7,6 +7,7 @@ export default function ThemeToggle() {
   const [light, setLight] = useState(false)
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- The layout script applies the persisted class before hydration.
     setLight(document.documentElement.classList.contains('light'))
   }, [])
 

@@ -33,6 +33,14 @@ const DEFAULT_CATEGORIES = [
     isAiGenerated: false,
   },
   {
+    name: 'Technology & Gadgets',
+    slug: 'technology-gadgets',
+    color: '#0ea5e9',
+    description:
+      'Consumer technology, phones, computers, cameras, wearables, smart home, hardware, product launches, tech comparisons, device tips, apps for everyday use, emerging gadgets, and practical technology advice that is not primarily software engineering',
+    isAiGenerated: false,
+  },
+  {
     name: 'Finance & Investing',
     slug: 'finance-investing',
     color: '#10b981',
@@ -46,6 +54,14 @@ const DEFAULT_CATEGORIES = [
     color: '#f97316',
     description:
       'Startups, founders, entrepreneurship, SaaS, product-market fit, fundraising, VC, angel investing, growth hacking, B2B, marketing, sales, revenue, bootstrapping, Y Combinator, acquisition, company building, business strategy',
+    isAiGenerated: false,
+  },
+  {
+    name: 'Marketing & Growth',
+    slug: 'marketing-growth',
+    color: '#fb7185',
+    description:
+      'Advertising, winning ads, ad creative, copywriting, media buying, growth marketing, social media strategy, SEO, email marketing, brand growth, customer acquisition, conversion optimization, campaign research, and marketing analytics',
     isAiGenerated: false,
   },
   {
@@ -70,6 +86,30 @@ const DEFAULT_CATEGORIES = [
     color: '#14b8a6',
     description:
       'Fitness, nutrition, longevity, biohacking, sleep, mental health, supplements, workout routines, diet, weight loss, strength training, cognitive performance, stress management, meditation, gut health, lab results, wearables like Whoop and Oura',
+    isAiGenerated: false,
+  },
+  {
+    name: 'Fashion & Style',
+    slug: 'fashion-style',
+    color: '#f472b6',
+    description:
+      'Fashion, personal style, outfits, wardrobe planning, clothing, shoes, accessories, menswear, womenswear, streetwear, styling advice, seasonal looks, fashion brands, and outfit inspiration',
+    isAiGenerated: false,
+  },
+  {
+    name: 'Beauty & Skincare',
+    slug: 'beauty-skincare',
+    color: '#fda4af',
+    description:
+      'Skincare routines, acne, scars, dermatology, beauty products, cosmetics, hair care, grooming, fragrances, product reviews, ingredients, treatments, and practical appearance advice',
+    isAiGenerated: false,
+  },
+  {
+    name: 'Dating & Relationships',
+    slug: 'dating-relationships',
+    color: '#e879f9',
+    description:
+      'Dating advice, attraction, flirting, conversation, relationship skills, communication, breakups, boundaries, intimacy, confidence in social situations, first dates, long-term partnerships, and personal stories about romantic relationships',
     isAiGenerated: false,
   },
   {
@@ -187,6 +227,10 @@ SIGNAL WEIGHTING (use all, not just text):
 - Image shows code, terminal, GitHub, a dev tool UI → dev-tools
 - Image is clearly a meme format or labeled as humor/satire → funny-memes with high confidence
 - Tools field mentions GitHub/Vercel/React/etc → dev-tools likely applies
+- Clothing, outfits, wardrobes, shoes, or styling → fashion-style
+- Acne, skin products, cosmetics, grooming, or hair care → beauty-skincare
+- Dating stories, attraction, flirting, or relationship communication → dating-relationships
+- Ads, campaigns, copywriting, or customer acquisition → marketing-growth
 - aiTags field is pre-computed context — trust it heavily for category signals
 - Hashtags like #bitcoin #eth → finance-crypto; #buildinpublic #saas → dev-tools/productivity
 

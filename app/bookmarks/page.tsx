@@ -15,6 +15,8 @@ import {
   X,
   ChevronDown,
   ArrowUpDown,
+  Shuffle,
+  Dices,
 } from 'lucide-react'
 import * as Select from '@radix-ui/react-select'
 import BookmarkCard from '@/components/bookmark-card'
@@ -33,6 +35,7 @@ interface Filters {
   sort: string
   page: number
   uncategorized: boolean
+  randomSeed: string
 }
 
 const DEFAULT_FILTERS: Filters = {
@@ -43,9 +46,10 @@ const DEFAULT_FILTERS: Filters = {
   sort: 'newest',
   page: 1,
   uncategorized: false,
+  randomSeed: '',
 }
 
-function buildUrl(filters: Filters, limit: number): string {
+function buildUrl(filters: Filters, limit: number, random = false): string {
   const params = new URLSearchParams()
   if (filters.q) params.set('q', filters.q)
   if (filters.uncategorized) {
@@ -58,6 +62,8 @@ function buildUrl(filters: Filters, limit: number): string {
   params.set('sort', filters.sort)
   params.set('page', String(filters.page))
   params.set('limit', String(limit))
+  if (filters.sort === 'random' && filters.randomSeed) params.set('seed', filters.randomSeed)
+  if (random) params.set('random', 'true')
   return `/api/bookmarks?${params.toString()}`
 }
 
@@ -215,6 +221,7 @@ function BookmarksPageInner() {
   const [bookmarks, setBookmarks] = useState<BookmarkWithMedia[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [randomLoading, setRandomLoading] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'compact'>('grid')
   const [openBookmark, setOpenBookmark] = useState<BookmarkWithMedia | null>(null)
   const searchRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -262,6 +269,29 @@ function BookmarksPageInner() {
   function clearAllFilters() {
     setSearchInput('')
     setFilters(DEFAULT_FILTERS)
+  }
+
+  function shuffleOrder() {
+    setFilters((prev) => ({
+      ...prev,
+      sort: 'random',
+      randomSeed: crypto.randomUUID(),
+      page: 1,
+    }))
+  }
+
+  async function showRandomBookmark() {
+    setRandomLoading(true)
+    try {
+      const res = await fetch(buildUrl({ ...filters, page: 1 }, 1, true))
+      if (!res.ok) throw new Error('Failed to pick a bookmark')
+      const data: BookmarksResponse = await res.json()
+      setOpenBookmark(data.bookmarks[0] ?? null)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setRandomLoading(false)
+    }
   }
 
   const mediaOptions = [
@@ -329,12 +359,41 @@ function BookmarksPageInner() {
 
             {/* Sort */}
             <button
-              onClick={() => updateFilter('sort', filters.sort === 'newest' ? 'oldest' : 'newest')}
+              onClick={() => setFilters((prev) => ({
+                ...prev,
+                sort: prev.sort === 'newest' ? 'oldest' : 'newest',
+                randomSeed: '',
+                page: 1,
+              }))}
               className="flex items-center gap-2 px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-sm text-zinc-400 hover:border-zinc-700 hover:text-zinc-200 transition-all shrink-0"
               title={`Sort: ${sortLabel}`}
             >
               <ArrowUpDown size={13} />
               <span className="hidden sm:inline">{sortLabel}</span>
+            </button>
+
+            <button
+              onClick={shuffleOrder}
+              disabled={loading || total === 0}
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0 ${
+                filters.sort === 'random'
+                  ? 'bg-cyan-400 border-cyan-300 text-zinc-950'
+                  : 'bg-zinc-900 border-zinc-800 text-cyan-300 hover:border-cyan-500/50'
+              }`}
+              title="Shuffle the bookmark order until you refresh"
+            >
+              <Dices size={13} />
+              <span>Random</span>
+            </button>
+
+            <button
+              onClick={showRandomBookmark}
+              disabled={loading || total === 0 || randomLoading}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-400 text-zinc-950 text-sm font-semibold hover:bg-amber-300 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0 shadow-[0_0_24px_rgba(251,191,36,0.14)]"
+              title="Pick a random bookmark from the current filters"
+            >
+              <Shuffle size={13} className={randomLoading ? 'animate-spin' : ''} />
+              <span className="hidden md:inline">Surprise me</span>
             </button>
 
             {/* View toggle */}
@@ -422,7 +481,7 @@ function BookmarksPageInner() {
                 <>
                   <span className="text-zinc-200 font-semibold">{total.toLocaleString()}</span>
                   {' '}bookmark{total !== 1 ? 's' : ''}
-                  {filters.q && <span className="text-zinc-600"> for "{filters.q}"</span>}
+                  {filters.q && <span className="text-zinc-600"> for &ldquo;{filters.q}&rdquo;</span>}
                 </>
               ) : (
                 'No bookmarks found'

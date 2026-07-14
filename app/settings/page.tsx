@@ -749,6 +749,7 @@ function FolderBrowser({ onSelect, onClose }: { onSelect: (path: string) => void
     setLoading(false)
   }, [])
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- Load the initial directory listing when the picker opens.
   useEffect(() => { browse() }, [browse])
 
   return (
