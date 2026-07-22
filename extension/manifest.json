@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Siftly Bookmark Sync",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Keeps your private Siftly library in sync with X bookmarks.",
   "permissions": ["alarms", "storage", "tabs"],
   "host_permissions": [

@@ -1,7 +1,7 @@
 globalThis.SIFTLY_CONFIG = {
   endpoint: 'https://twitterbookmarks.vercel.app/api/sync/bookmarks',
   token: '',
-  intervalMinutes: 240,
+  intervalMinutes: 1440,
   maxPages: 5,
 }
 

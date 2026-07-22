@@ -1,6 +1,7 @@
 importScripts('config.js')
 
 const ALARM_NAME = 'siftly-bookmark-sync'
+const LAST_SYNC_ATTEMPT_KEY = 'siftlyLastSyncAttemptAt'
 let syncPromise = null
 
 function config() {
@@ -84,6 +85,7 @@ async function runSync() {
   if (syncPromise) return syncPromise
 
   syncPromise = (async () => {
+    await chrome.storage.local.set({ [LAST_SYNC_ATTEMPT_KEY]: Date.now() })
     await saveStatus('syncing')
     let tabInfo
 
@@ -130,30 +132,52 @@ async function runSync() {
   }
 }
 
-function schedule() {
+async function runAutomaticSync() {
+  const intervalMs = (config().intervalMinutes ?? 1440) * 60 * 1000
+  const stored = await chrome.storage.local.get(LAST_SYNC_ATTEMPT_KEY)
+  const lastSyncAttemptAt = Number(stored[LAST_SYNC_ATTEMPT_KEY] ?? 0)
+
+  if (Date.now() - lastSyncAttemptAt < intervalMs) {
+    await schedule()
+    return { skipped: true, reason: 'not_due' }
+  }
+
+  return runSync()
+}
+
+async function schedule() {
+  const intervalMinutes = config().intervalMinutes ?? 1440
+  const intervalMs = intervalMinutes * 60 * 1000
+  const stored = await chrome.storage.local.get(LAST_SYNC_ATTEMPT_KEY)
+  const lastSyncAttemptAt = Number(stored[LAST_SYNC_ATTEMPT_KEY] ?? 0)
+  const remainingMs = Math.max(0, intervalMs - (Date.now() - lastSyncAttemptAt))
+
   chrome.alarms.create(ALARM_NAME, {
-    delayInMinutes: 1,
-    periodInMinutes: config().intervalMinutes ?? 240,
+    delayInMinutes: Math.max(1, Math.ceil(remainingMs / 60000)),
+    periodInMinutes: intervalMinutes,
   })
 }
 
 chrome.runtime.onInstalled.addListener(() => {
-  schedule()
-  setTimeout(() => void runSync(), 1500)
+  void schedule()
+  setTimeout(() => void runAutomaticSync(), 1500)
 })
 chrome.runtime.onStartup.addListener(() => {
-  schedule()
-  setTimeout(() => void runSync(), 3000)
+  void schedule()
+  setTimeout(() => void runAutomaticSync(), 3000)
 })
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === ALARM_NAME) void runSync()
+  if (alarm.name === ALARM_NAME) void runAutomaticSync()
 })
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type !== 'SIFTLY_SYNC_NOW') return false
   runSync()
-    .then((result) => sendResponse({ ok: true, ...result }))
+    .then(async (result) => {
+      await schedule()
+      sendResponse({ ok: true, ...result })
+    })
     .catch((error) => sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) }))
   return true
 })
 
-schedule()
+void schedule()

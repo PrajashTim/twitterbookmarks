@@ -5,7 +5,7 @@ const syncButton = document.querySelector('#sync')
 function render(status) {
   if (!status) {
     statusElement.textContent = 'Automatic sync is ready.'
-    detailsElement.textContent = 'Chrome checks when it starts and every four hours.'
+    detailsElement.textContent = 'Chrome syncs automatically at most once every 24 hours.'
     return
   }
   if (status.status === 'syncing') {
