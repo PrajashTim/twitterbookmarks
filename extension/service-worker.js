@@ -81,7 +81,7 @@ async function uploadTweets(tweets) {
   return result
 }
 
-async function runSync() {
+async function runSync({ maxPages = config().dailyMaxPages ?? 1, scanKnownHistory = false } = {}) {
   if (syncPromise) return syncPromise
 
   syncPromise = (async () => {
@@ -99,7 +99,7 @@ async function runSync() {
       let skipped = 0
       let pages = 0
 
-      for (let page = 0; page < (config().maxPages ?? 5); page++) {
+      for (let page = 0; page < maxPages; page++) {
         const fetched = await askForPage(tabInfo.tab.id, cursor)
         if (!fetched.tweets?.length) break
 
@@ -109,8 +109,9 @@ async function runSync() {
         skipped += result.skipped ?? 0
         pages++
 
-        // X returns newest first, so a page with no imports reaches known history.
-        if ((result.imported ?? 0) === 0 || !fetched.nextCursor) break
+        // Daily sync only needs new bookmarks at the top. A manual backfill keeps
+        // walking older pages so a new library can import its full history at once.
+        if ((!scanKnownHistory && (result.imported ?? 0) === 0) || !fetched.nextCursor) break
         cursor = fetched.nextCursor
       }
 
@@ -159,8 +160,14 @@ async function schedule() {
 }
 
 chrome.runtime.onInstalled.addListener(() => {
-  void schedule()
-  setTimeout(() => void runAutomaticSync(), 1500)
+  void (async () => {
+    const stored = await chrome.storage.local.get(LAST_SYNC_ATTEMPT_KEY)
+    if (!stored[LAST_SYNC_ATTEMPT_KEY]) {
+      // Installation never opens X unexpectedly. The first full import is manual.
+      await chrome.storage.local.set({ [LAST_SYNC_ATTEMPT_KEY]: Date.now() })
+    }
+    await schedule()
+  })()
 })
 chrome.runtime.onStartup.addListener(() => {
   void schedule()
@@ -170,8 +177,13 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === ALARM_NAME) void runAutomaticSync()
 })
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (message?.type !== 'SIFTLY_SYNC_NOW') return false
-  runSync()
+  if (message?.type !== 'SIFTLY_SYNC_NOW' && message?.type !== 'SIFTLY_SYNC_FULL') return false
+  const isFullImport = message.type === 'SIFTLY_SYNC_FULL'
+  runSync(
+    isFullImport
+      ? { maxPages: config().fullImportMaxPages ?? 30, scanKnownHistory: true }
+      : undefined,
+  )
     .then(async (result) => {
       await schedule()
       sendResponse({ ok: true, ...result })

@@ -684,7 +684,7 @@ function LiveImportTab({ onSynced }: { onSynced: (result: ImportResult) => void 
     fetch('/api/import/x-oauth/status')
       .then(async (r) => {
         if (!r.ok) throw new Error('Failed to check status')
-        const data: OAuthStatus = await r.json()
+        const data = await r.json() as OAuthStatus
         setStatus(data)
       })
       .catch(() => setError('Could not connect to the server'))
@@ -696,8 +696,9 @@ function LiveImportTab({ onSynced }: { onSynced: (result: ImportResult) => void 
     setConnecting(true)
     try {
       const res = await fetch('/api/import/x-oauth/authorize')
-      const data = await res.json()
+      const data = await res.json() as { authUrl?: string; error?: string }
       if (!res.ok) throw new Error(data.error ?? 'Failed to start OAuth')
+      if (!data.authUrl) throw new Error('X did not provide an authorization link')
       window.location.href = data.authUrl
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to connect')
@@ -728,7 +729,12 @@ function LiveImportTab({ onSynced }: { onSynced: (result: ImportResult) => void 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ maxPages: 10 }),
       })
-      const data = await res.json()
+      const data = await res.json() as {
+        imported?: number
+        skipped?: number
+        total?: number
+        error?: string
+      }
       if (!res.ok) throw new Error(data.error ?? 'Fetch failed')
       onSynced({
         imported: data.imported ?? 0,
@@ -1218,7 +1224,7 @@ function UncategorizedBanner({ onCategorize, onReprocess }: { onCategorize: () =
     fetch('/api/stats')
       .then((r) => {
         if (!r.ok) throw new Error('Stats fetch failed')
-        return r.json()
+        return r.json() as Promise<{ totalBookmarks?: number; uncategorizedCount?: number }>
       })
       .then((d: { totalBookmarks?: number; uncategorizedCount?: number }) => {
         setTotalBookmarks(d.totalBookmarks ?? 0)
@@ -1280,7 +1286,7 @@ export default function ImportPage() {
   // Auto-resume to step 3 if the pipeline is already running (e.g. user navigated away and back)
   useEffect(() => {
     fetch('/api/categorize')
-      .then((r) => r.json())
+      .then((r) => r.json() as Promise<{ status: string }>)
       .then((d: { status: string }) => {
         if (d.status === 'running' || d.status === 'stopping') setStep(3)
       })
@@ -1304,7 +1310,12 @@ export default function ImportPage() {
       formData.append('source', importSource)
 
       const res = await fetch('/api/import', { method: 'POST', body: formData })
-      const data = await res.json()
+      const data = await res.json() as {
+        imported?: number
+        skipped?: number
+        parsed?: number
+        error?: string
+      }
 
       if (!res.ok) throw new Error(data.error ?? 'Import failed')
 

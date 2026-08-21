@@ -245,7 +245,7 @@ function extractMedia(tweet: TweetResult) {
 export async function POST(request: NextRequest): Promise<NextResponse> {
   let body: { authToken?: string; ct0?: string; source?: string; userId?: string } = {}
   try {
-    body = await request.json()
+    body = (await request.json()) as typeof body
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }

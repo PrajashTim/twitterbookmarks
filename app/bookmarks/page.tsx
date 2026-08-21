@@ -172,7 +172,7 @@ function BookmarksPageInner() {
       try {
         const res = await fetch(buildUrl(filters, pageSize), { signal: controller.signal })
         if (!res.ok) throw new Error('Failed to fetch')
-        const data: BookmarksResponse = await res.json()
+        const data = await res.json() as BookmarksResponse
         setBookmarks(data.bookmarks)
         setTotal(data.total)
         setLoadedPage(1)
@@ -204,7 +204,7 @@ function BookmarksPageInner() {
     try {
       const res = await fetch(buildUrl(filters, pageSize, nextPage), { signal: controller.signal })
       if (!res.ok) throw new Error('Failed to fetch more bookmarks')
-      const data: BookmarksResponse = await res.json()
+      const data = await res.json() as BookmarksResponse
       setBookmarks((current) => {
         const existingIds = new Set(current.map((bookmark) => bookmark.id))
         return [...current, ...data.bookmarks.filter((bookmark) => !existingIds.has(bookmark.id))]
@@ -276,7 +276,7 @@ function BookmarksPageInner() {
     try {
       const res = await fetch(buildUrl(filters, 1, 1, true))
       if (!res.ok) throw new Error('Failed to pick a bookmark')
-      const data: BookmarksResponse = await res.json()
+      const data = await res.json() as BookmarksResponse
       setOpenBookmark(data.bookmarks[0] ?? null)
     } catch (err) {
       console.error(err)

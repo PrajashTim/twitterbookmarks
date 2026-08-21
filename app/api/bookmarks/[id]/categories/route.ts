@@ -9,7 +9,7 @@ export async function PUT(
   const { id } = await params
   let body: { categoryIds?: string[] } = {}
   try {
-    body = await request.json()
+    body = (await request.json()) as typeof body
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }

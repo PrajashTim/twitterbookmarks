@@ -186,7 +186,7 @@ function buildIndexEntry(b: {
 // ─── Main handler ─────────────────────────────────────────────────────────────
 export async function POST(request: NextRequest): Promise<NextResponse> {
   let body: { query?: string; category?: string } = {}
-  try { body = await request.json() } catch {
+  try { body = (await request.json()) as typeof body } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 

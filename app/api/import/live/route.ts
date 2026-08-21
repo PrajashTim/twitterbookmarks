@@ -30,7 +30,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   let body: { authToken?: string; ct0?: string; syncInterval?: string } = {}
   try {
-    body = await request.json()
+    body = (await request.json()) as typeof body
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }

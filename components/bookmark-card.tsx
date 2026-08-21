@@ -45,7 +45,7 @@ function LinkPreview({ url, tweetUrl, tweetId, prominent = false }: { url: strin
     }
     let cancelled = false
     fetch(`/api/link-preview?url=${encodeURIComponent(url)}${tweetId ? `&tweetId=${tweetId}` : ''}`)
-      .then((r) => r.json())
+      .then((r) => r.json() as Promise<LinkPreviewData & { error?: string }>)
       .then((d: LinkPreviewData & { error?: string }) => {
         if (cancelled) return
         const result = d.error || !d.title ? null : d
@@ -201,7 +201,7 @@ async function fetchAllCategories(): Promise<Category[]> {
   cacheFetchPromise = fetch('/api/categories')
     .then((res) => {
       if (!res.ok) throw new Error(`Failed to fetch categories: ${res.status}`)
-      return res.json()
+      return res.json() as Promise<{ categories: Category[] }>
     })
     .then((data: { categories: Category[] }) => {
       cachedCategories = data.categories

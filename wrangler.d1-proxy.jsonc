@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "twitter-bookmarks-db",
+  "main": "cloudflare/d1-proxy/worker.ts",
+  "compatibility_date": "2026-08-21",
+  "d1_databases": [
+    {
+      "binding": "BOOKMARKS_DB",
+      "database_name": "twitter-bookmarks",
+      "database_id": "9572358b-0055-4808-8d24-ab7912bfd995"
+    }
+  ]
+}

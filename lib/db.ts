@@ -1,20 +1,34 @@
-import { PrismaPg } from '@prisma/adapter-pg'
+import { PrismaD1 } from '@prisma/adapter-d1'
 import { PrismaClient } from '@/app/generated/prisma/client'
+import { RemoteD1Database } from '@/lib/remote-d1'
 
-// The placeholder lets build/test imports initialize without opening a connection.
-const dbUrl =
-  process.env.DATABASE_POSTGRES_URL ??
-  process.env.DATABASE_URL ??
-  'postgresql://unused:unused@localhost:5432/unused'
+type D1AdapterDatabase = ConstructorParameters<typeof PrismaD1>[0]
+type PrismaGlobal = typeof globalThis & { __bookmarkPrisma?: PrismaClient }
 
-const globalForPrisma = globalThis as unknown as { prisma: PrismaClient }
+function createPrismaClient(): PrismaClient {
+  const url = process.env.BOOKMARKS_D1_PROXY_URL
+  const token = process.env.BOOKMARKS_D1_PROXY_TOKEN
 
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    adapter: new PrismaPg({ connectionString: dbUrl }),
-  })
+  if (!url || !token) {
+    throw new Error('Cloudflare D1 proxy environment variables are not configured')
+  }
 
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
+  const database = new RemoteD1Database(url, token) as unknown as D1AdapterDatabase
+  return new PrismaClient({ adapter: new PrismaD1(database) })
+}
+
+function getPrismaClient(): PrismaClient {
+  const global = globalThis as PrismaGlobal
+  global.__bookmarkPrisma ??= createPrismaClient()
+  return global.__bookmarkPrisma
+}
+
+// Delay environment validation until the first database call so static builds do
+// not require production-only secrets.
+export const prisma = new Proxy({} as PrismaClient, {
+  get(_target, property) {
+    return Reflect.get(getPrismaClient(), property)
+  },
+})
 
 export default prisma

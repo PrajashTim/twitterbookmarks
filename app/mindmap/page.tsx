@@ -83,7 +83,7 @@ function UncategorizedState({ totalBookmarks }: { totalBookmarks: number }) {
   // Auto-attach if pipeline is already running (e.g. started from import screen)
   useEffect(() => {
     fetch('/api/categorize')
-      .then((r) => r.json())
+      .then((r) => r.json() as Promise<CategorizeStatus>)
       .then((d: CategorizeStatus) => {
         if (d.status === 'running' || d.status === 'stopping') {
           setStatus(d)

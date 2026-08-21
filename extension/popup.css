@@ -8,4 +8,5 @@ p { margin: 0 0 7px; color: #a5f3fc; font: 13px/1.4 ui-sans-serif, sans-serif; }
 button, a { display: block; box-sizing: border-box; width: 100%; border-radius: 10px; text-align: center; font: 700 13px/1 ui-sans-serif, sans-serif; }
 button { margin-top: 14px; padding: 11px; border: 0; background: #22d3ee; color: #082f49; cursor: pointer; }
 button:disabled { cursor: wait; opacity: .65; }
+button.secondary { margin-top: 8px; background: transparent; color: #a5f3fc; border: 1px solid #164e63; }
 a { margin-top: 8px; padding: 10px; color: #cbd5e1; text-decoration: none; border: 1px solid #334155; }

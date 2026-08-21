@@ -6,6 +6,8 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url: process.env["DATABASE_POSTGRES_URL"] ?? process.env["DATABASE_URL"] ?? "postgresql://unused:unused@localhost:5432/unused",
+    // D1 is configured by Wrangler at runtime. This local URL is only used by
+    // Prisma's schema tooling when it needs a datasource value.
+    url: "file:./prisma/dev.db",
   },
 });

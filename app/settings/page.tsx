@@ -134,7 +134,7 @@ function ApiKeyField({
   // Load existing saved key status on mount
   useEffect(() => {
     fetch('/api/settings')
-      .then((r) => r.json())
+      .then((r) => r.json() as Promise<Record<string, unknown>>)
       .then((d: Record<string, unknown>) => {
         const hasKeyField = fieldKey === 'openaiApiKey' ? 'hasOpenaiKey' : fieldKey === 'minimaxApiKey' ? 'hasMinimaxKey' : 'hasAnthropicKey'
         const hasKey = d[hasKeyField]
@@ -325,7 +325,7 @@ function ModelSelector({
 
   useEffect(() => {
     fetch('/api/settings')
-      .then((r) => r.json())
+      .then((r) => r.json() as Promise<Record<string, unknown>>)
       .then((d) => { if (d[settingKey]) setValue(d[settingKey] as string) })
       .catch(() => {})
   }, [settingKey])
@@ -395,7 +395,7 @@ function ClaudeCliStatusBox() {
 
   useEffect(() => {
     fetch('/api/settings/cli-status')
-      .then((r) => r.json())
+      .then((r) => r.json() as Promise<CliStatus>)
       .then((d: CliStatus) => setStatus(d))
       .catch(() => setStatus({ available: false }))
   }, [])
@@ -453,7 +453,7 @@ function CodexCliStatusBox() {
 
   useEffect(() => {
     fetch('/api/settings/cli-status')
-      .then((r) => r.json())
+      .then((r) => r.json() as Promise<{ codex?: { available: boolean; expired?: boolean; planType?: string; authMode?: string; hasCredentials?: boolean } }>)
       .then((d: { codex?: { available: boolean; expired?: boolean; planType?: string; authMode?: string; hasCredentials?: boolean } }) => setStatus(d.codex ?? { available: false }))
       .catch(() => setStatus({ available: false }))
   }, [])
@@ -567,7 +567,7 @@ function ApiKeySection({ onToast }: { onToast: (t: Toast) => void }) {
 
   useEffect(() => {
     fetch('/api/settings')
-      .then((r) => r.json())
+      .then((r) => r.json() as Promise<{ provider?: string }>)
       .then((d: { provider?: string }) => {
         setProvider(d.provider === 'openai' ? 'openai' : d.provider === 'minimax' ? 'minimax' : 'anthropic')
       })
@@ -740,11 +740,15 @@ function FolderBrowser({ onSelect, onClose }: { onSelect: (path: string) => void
     try {
       const params = dirPath ? `?path=${encodeURIComponent(dirPath)}` : ''
       const res = await fetch(`/api/settings/browse${params}`)
-      const data = await res.json()
+      const data = await res.json() as {
+        current?: string
+        parent?: string | null
+        directories?: BrowseDir[]
+      }
       if (!res.ok) return
-      setCurrent(data.current)
-      setParent(data.parent)
-      setDirs(data.directories)
+      setCurrent(data.current ?? '')
+      setParent(data.parent ?? null)
+      setDirs(data.directories ?? [])
     } catch {}
     setLoading(false)
   }, [])
@@ -813,7 +817,7 @@ function ObsidianExportBlock({ onToast }: { onToast: (t: Toast) => void }) {
 
   useEffect(() => {
     fetch('/api/settings')
-      .then((r) => r.json())
+      .then((r) => r.json() as Promise<Record<string, unknown>>)
       .then((d: Record<string, unknown>) => {
         if (d.obsidianVaultPath) setSavedPath(d.obsidianVaultPath as string)
       })
@@ -833,7 +837,7 @@ function ObsidianExportBlock({ onToast }: { onToast: (t: Toast) => void }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ obsidianVaultPath: finalPath.trim() }),
       })
-      const data = await res.json()
+      const data = await res.json() as { error?: string }
       if (!res.ok) throw new Error(data.error ?? 'Failed to save')
       setSavedPath(finalPath.trim())
       setVaultPath(finalPath.trim())
@@ -854,7 +858,7 @@ function ObsidianExportBlock({ onToast }: { onToast: (t: Toast) => void }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ overwrite }),
       })
-      const data = await res.json()
+      const data = await res.json() as ObsidianResult & { error?: string }
       if (!res.ok) throw new Error(data.error ?? 'Export failed')
       setResult(data)
       onToast({ type: 'success', message: `Exported ${data.written} notes to Obsidian` })
@@ -1146,7 +1150,7 @@ function XOAuthSection({ onToast }: { onToast: (t: Toast) => void }) {
 
   useEffect(() => {
     fetch('/api/settings')
-      .then((r) => r.json())
+      .then((r) => r.json() as Promise<Record<string, unknown>>)
       .then((d: Record<string, unknown>) => {
         if (d.hasXOAuth && d.xOAuthClientId) setSavedId(d.xOAuthClientId as string)
         if (d.xOAuthClientSecret) setSavedSecret(d.xOAuthClientSecret as string)

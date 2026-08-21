@@ -45,9 +45,9 @@ function AddCategoryModal({ open, onClose, onAdd }: AddCategoryModalProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: name.trim(), color, description: description.trim() || undefined }),
       })
-      const data = await res.json()
+      const data = await res.json() as { category?: Category; error?: string }
       if (!res.ok) throw new Error(data.error ?? 'Failed to create category')
-      onAdd(data.category)
+      if (data.category) onAdd(data.category)
       setName('')
       setDescription('')
       setColor(PRESET_COLORS[0])
@@ -199,7 +199,7 @@ function AIAssistantModal({ open, onClose, onCategoriesCreated }: AIAssistantMod
     setError('')
     try {
       const res = await fetch('/api/categories/suggest')
-      const data = await res.json()
+      const data = await res.json() as { suggestions?: CategorySuggestion[]; error?: string }
       if (!res.ok) throw new Error(data.error ?? 'Failed to generate suggestions')
       setSuggestions(data.suggestions || [])
       setSelectedSuggestions(new Set(data.suggestions?.map((s: CategorySuggestion) => s.slug) || []))
@@ -237,11 +237,11 @@ function AIAssistantModal({ open, onClose, onCategoriesCreated }: AIAssistantMod
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ suggestions: selected }),
       })
-      const data = await res.json()
+      const data = await res.json() as { error?: string }
       if (!res.ok) throw new Error(data.error ?? 'Failed to create categories')
 
       const catsRes = await fetch('/api/categories')
-      const catsData = await catsRes.json()
+      const catsData = await catsRes.json() as { categories?: Category[] }
       if (catsData.categories) onCategoriesCreated(catsData.categories)
 
       onClose()
@@ -469,8 +469,8 @@ export default function CategoriesPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/categories').then((r) => r.json()),
-      fetch('/api/stats').then((r) => r.json()),
+      fetch('/api/categories').then((r) => r.json() as Promise<{ categories?: Category[] }>),
+      fetch('/api/stats').then((r) => r.json() as Promise<{ totalBookmarks?: number }>),
     ])
       .then(([catData, statsData]) => {
         setCategories(catData.categories ?? [])

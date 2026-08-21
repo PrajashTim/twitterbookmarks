@@ -5,7 +5,7 @@ import prisma from '@/lib/db'
 export async function POST(request: NextRequest): Promise<NextResponse> {
   let body: { category?: string; overwrite?: boolean } = {}
   try {
-    body = await request.json()
+    body = (await request.json()) as typeof body
   } catch {
     // body stays as defaults
   }

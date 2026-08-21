@@ -1,6 +1,7 @@
 const statusElement = document.querySelector('#status')
 const detailsElement = document.querySelector('#details')
 const syncButton = document.querySelector('#sync')
+const fullSyncButton = document.querySelector('#full-sync')
 
 function render(status) {
   if (!status) {
@@ -25,13 +26,23 @@ function render(status) {
 }
 
 chrome.storage.local.get('siftlyStatus').then(({ siftlyStatus }) => render(siftlyStatus))
-syncButton.addEventListener('click', async () => {
+async function startSync(messageType) {
   syncButton.disabled = true
-  syncButton.textContent = 'Syncing...'
+  fullSyncButton.disabled = true
+  syncButton.textContent = messageType === 'SIFTLY_SYNC_NOW' ? 'Syncing...' : 'Sync latest bookmarks'
+  fullSyncButton.textContent = messageType === 'SIFTLY_SYNC_FULL' ? 'Importing...' : 'Import full library'
   statusElement.textContent = 'Syncing with X...'
-  const result = await chrome.runtime.sendMessage({ type: 'SIFTLY_SYNC_NOW' })
+  detailsElement.textContent = messageType === 'SIFTLY_SYNC_FULL'
+    ? 'Reading your X bookmark history. Keep Chrome open until this finishes.'
+    : 'Checking the newest bookmarks.'
+  const result = await chrome.runtime.sendMessage({ type: messageType })
   const { siftlyStatus } = await chrome.storage.local.get('siftlyStatus')
   render(siftlyStatus ?? (result.ok ? { status: 'success', ...result } : { status: 'error', error: result.error }))
   syncButton.disabled = false
-  syncButton.textContent = 'Sync now'
-})
+  fullSyncButton.disabled = false
+  syncButton.textContent = 'Sync latest bookmarks'
+  fullSyncButton.textContent = 'Import full library'
+}
+
+syncButton.addEventListener('click', () => startSync('SIFTLY_SYNC_NOW'))
+fullSyncButton.addEventListener('click', () => startSync('SIFTLY_SYNC_FULL'))
