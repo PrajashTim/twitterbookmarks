@@ -13,12 +13,13 @@ import {
   ArrowUpDown,
   Shuffle,
   Dices,
+  Sparkles,
 } from 'lucide-react'
 import * as Select from '@radix-ui/react-select'
 import BookmarkCard from '@/components/bookmark-card'
 import BookmarkRow from '@/components/bookmark-row'
 import BookmarkDetailModal from '@/components/bookmark-detail-modal'
-import type { BookmarkWithMedia, BookmarksResponse } from '@/lib/types'
+import type { BookmarkWithMedia, BookmarksResponse, Category } from '@/lib/types'
 
 const DEFAULT_PAGE_SIZE = 24
 const COMPACT_PAGE_SIZE = 100
@@ -38,9 +39,103 @@ const DEFAULT_FILTERS: Filters = {
   category: '',
   mediaType: '',
   source: '',
-  sort: 'newest',
+  sort: 'best',
   uncategorized: false,
   randomSeed: '',
+}
+
+/** "best" = relevance while searching, newest otherwise. */
+function apiSort(filters: Filters): string {
+  if (filters.sort === 'best') return filters.q ? 'relevance' : 'newest'
+  return filters.sort
+}
+
+function useColumnCount(ref: React.RefObject<HTMLDivElement | null>): number {
+  const [count, setCount] = useState(1)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const update = () => {
+      const w = el.clientWidth
+      setCount(w >= 1300 ? 4 : w >= 940 ? 3 : w >= 560 ? 2 : 1)
+    }
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [ref])
+  return count
+}
+
+function Masonry({ items, highlight }: { items: BookmarkWithMedia[]; highlight: string[] }) {
+  const ref = useRef<HTMLDivElement | null>(null)
+  const columnCount = useColumnCount(ref)
+  const columns: BookmarkWithMedia[][] = Array.from({ length: columnCount }, () => [])
+  items.forEach((item, index) => columns[index % columnCount].push(item))
+  return (
+    <div ref={ref} className="masonry-columns">
+      {columns.map((column, i) => (
+        <div key={i} className="masonry-column">
+          {column.map((bookmark) => (
+            <div key={bookmark.id} className="masonry-item">
+              <BookmarkCard bookmark={bookmark} highlight={highlight} />
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function CategoryChips({
+  categories,
+  active,
+  onSelect,
+}: {
+  categories: Category[]
+  active: string
+  onSelect: (slug: string) => void
+}) {
+  if (categories.length === 0) return null
+  const visible = categories.filter((c) => c.bookmarkCount > 0)
+  return (
+    <div className="relative -mx-3 sm:mx-0 mt-3">
+      <div className="no-scrollbar flex items-center gap-1.5 overflow-x-auto px-3 sm:px-0 pb-0.5">
+        <button
+          onClick={() => onSelect('')}
+          className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition-all border ${
+            active === ''
+              ? 'bg-zinc-100 text-zinc-950 border-zinc-100'
+              : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:text-zinc-200 hover:border-zinc-700'
+          }`}
+        >
+          All
+        </button>
+        {visible.map((cat) => {
+          const isActive = active === cat.slug
+          return (
+            <button
+              key={cat.slug}
+              onClick={() => onSelect(isActive ? '' : cat.slug)}
+              className={`group shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all border ${
+                isActive ? 'text-zinc-950' : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:text-zinc-100 hover:border-zinc-700'
+              }`}
+              style={isActive ? { backgroundColor: cat.color, borderColor: cat.color } : undefined}
+            >
+              <span
+                className="h-1.5 w-1.5 rounded-full"
+                style={{ backgroundColor: isActive ? 'rgba(0,0,0,0.55)' : cat.color }}
+              />
+              {cat.name}
+              <span className={`tabular-nums ${isActive ? 'text-zinc-950/60' : 'text-zinc-600 group-hover:text-zinc-500'}`}>
+                {cat.bookmarkCount}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
 function buildUrl(filters: Filters, limit: number, page = 1, random = false): string {
@@ -53,7 +148,7 @@ function buildUrl(filters: Filters, limit: number, page = 1, random = false): st
   }
   if (filters.mediaType) params.set('mediaType', filters.mediaType)
   if (filters.source) params.set('source', filters.source)
-  params.set('sort', filters.sort)
+  params.set('sort', apiSort(filters))
   params.set('page', String(page))
   params.set('limit', String(limit))
   if (filters.sort === 'random' && filters.randomSeed) params.set('seed', filters.randomSeed)
@@ -142,7 +237,10 @@ function BookmarksPageInner() {
     mediaType: searchParams.get('mediaType') ?? '',
     q: searchParams.get('q') ?? '',
   }))
-  const [searchInput, setSearchInput] = useState('')
+  const [searchInput, setSearchInput] = useState(() => searchParams.get('q') ?? '')
+  const [categories, setCategories] = useState<Category[]>([])
+  const [matchMode, setMatchMode] = useState<'all' | 'any'>('all')
+  const [highlight, setHighlight] = useState<string[]>([])
   const [bookmarks, setBookmarks] = useState<BookmarkWithMedia[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -176,6 +274,8 @@ function BookmarksPageInner() {
         setBookmarks(data.bookmarks)
         setTotal(data.total)
         setLoadedPage(1)
+        setMatchMode(data.matchMode ?? 'all')
+        setHighlight(data.highlight ?? [])
       } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') return
         console.error(err)
@@ -189,6 +289,24 @@ function BookmarksPageInner() {
     fetchFirstPage()
     return () => controller.abort()
   }, [filters, pageSize])
+
+  useEffect(() => {
+    fetch('/api/categories')
+      .then((r) => r.json() as Promise<{ categories?: Category[] }>)
+      .then((d) => setCategories(d.categories ?? []))
+      .catch(() => {})
+  }, [])
+
+  // Keep the URL in sync so searches and filters can be bookmarked / shared.
+  useEffect(() => {
+    const params = new URLSearchParams()
+    if (filters.q) params.set('q', filters.q)
+    if (filters.category) params.set('category', filters.category)
+    if (filters.uncategorized) params.set('uncategorized', 'true')
+    if (filters.mediaType) params.set('mediaType', filters.mediaType)
+    const qs = params.toString()
+    window.history.replaceState(null, '', qs ? `/bookmarks?${qs}` : '/bookmarks')
+  }, [filters.q, filters.category, filters.uncategorized, filters.mediaType])
 
   const hasMore = bookmarks.length < total
 
@@ -296,13 +414,16 @@ function BookmarksPageInner() {
   ]
 
   const sortOptions = [
+    { label: filters.q ? 'Best match' : 'Newest first', value: 'best' },
     { label: 'Newest first', value: 'newest' },
     { label: 'Oldest first', value: 'oldest' },
+    { label: 'Shuffled', value: 'random' },
   ]
 
-  const hasActiveFilters = !!(filters.q || filters.category || filters.mediaType || filters.source || filters.sort !== 'newest' || filters.uncategorized)
+  const hasActiveFilters = !!(filters.q || filters.category || filters.mediaType || filters.source || (filters.sort !== 'best' && filters.sort !== 'random') || filters.uncategorized)
 
   const sortLabel = sortOptions.find((o) => o.value === filters.sort)?.label ?? 'Newest first'
+  const activeCategory = categories.find((c) => c.slug === filters.category)
 
   return (
     <div className="flex flex-col h-full">
@@ -310,17 +431,23 @@ function BookmarksPageInner() {
       {/* ── Sticky top bar ── */}
       <div className="md:sticky md:top-0 z-20 bg-zinc-950/90 backdrop-blur-lg border-b border-zinc-800/60">
         <div className="px-3 sm:px-6 md:px-8 py-3 sm:py-4">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+          <div className="flex flex-col xl:flex-row xl:items-center gap-2 xl:gap-3">
 
             {/* Search */}
             <div className="relative flex-1">
-              <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-600 pointer-events-none" />
+              <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
               <input
-                type="text"
-                placeholder="Search bookmarks..."
+                type="search"
+                placeholder='Search words, @author, or "exact phrase"'
                 value={searchInput}
                 onChange={(e) => updateSearch(e.target.value)}
-                className="w-full pl-9 pr-8 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-100 placeholder:text-zinc-600 text-sm focus:outline-none focus:border-indigo-500/60 focus:ring-1 focus:ring-indigo-500/20 transition-all"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    if (searchRef.current) clearTimeout(searchRef.current)
+                    setFilters((prev) => ({ ...prev, q: searchInput }))
+                  }
+                }}
+                className="w-full pl-10 pr-8 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-100 placeholder:text-zinc-500 text-sm focus:outline-none focus:border-indigo-500/70 focus:ring-4 focus:ring-indigo-500/10 transition-all [&::-webkit-search-cancel-button]:hidden"
               />
               {searchInput && (
                 <button
@@ -332,7 +459,7 @@ function BookmarksPageInner() {
               )}
             </div>
 
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
+            <div className="no-scrollbar flex items-center gap-2 overflow-x-auto">
             {/* Filters */}
             <SelectMenu
               value={filters.mediaType}
@@ -351,11 +478,11 @@ function BookmarksPageInner() {
 
             {/* Sort */}
             <button
-              onClick={() => setFilters((prev) => ({
-                ...prev,
-                sort: prev.sort === 'newest' ? 'oldest' : 'newest',
-                randomSeed: '',
-              }))}
+              onClick={() => setFilters((prev) => {
+                const cycle = prev.q ? ['best', 'newest', 'oldest'] : ['best', 'oldest']
+                const next = cycle[(cycle.indexOf(prev.sort) + 1) % cycle.length] ?? 'best'
+                return { ...prev, sort: next, randomSeed: '' }
+              })}
               className="flex min-h-10 items-center gap-2 px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-sm text-zinc-400 hover:border-zinc-700 hover:text-zinc-200 transition-all shrink-0"
               title={`Sort: ${sortLabel}`}
             >
@@ -421,6 +548,12 @@ function BookmarksPageInner() {
 
           </div>
 
+          <CategoryChips
+            categories={categories}
+            active={filters.uncategorized ? '__none' : filters.category}
+            onSelect={(slug) => setFilters((prev) => ({ ...prev, category: slug, uncategorized: false }))}
+          />
+
           {/* Active filter chips */}
           {hasActiveFilters && (
             <div className="flex items-center gap-2 mt-3 flex-wrap">
@@ -432,7 +565,7 @@ function BookmarksPageInner() {
               )}
               {filters.category && (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-medium">
-                  {filters.category.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                  {activeCategory?.name ?? filters.category.replace(/-/g, ' ')}
                   <button onClick={() => updateFilter('category', '')} className="text-indigo-400 hover:text-indigo-200 transition-colors"><X size={10} /></button>
                 </span>
               )}
@@ -448,10 +581,10 @@ function BookmarksPageInner() {
                   <button onClick={() => updateFilter('source', '')} className="text-indigo-400 hover:text-indigo-200 transition-colors"><X size={10} /></button>
                 </span>
               )}
-              {filters.sort !== 'newest' && (
+              {filters.sort !== 'best' && filters.sort !== 'random' && (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-medium">
                   {sortLabel}
-                  <button onClick={() => updateFilter('sort', 'newest')} className="text-indigo-400 hover:text-indigo-200 transition-colors"><X size={10} /></button>
+                  <button onClick={() => updateFilter('sort', 'best')} className="text-indigo-400 hover:text-indigo-200 transition-colors"><X size={10} /></button>
                 </span>
               )}
               <button onClick={clearAllFilters} className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors underline underline-offset-2">
@@ -463,7 +596,7 @@ function BookmarksPageInner() {
       </div>
 
       {/* ── Content ── */}
-      <div className="flex-1 px-3 sm:px-6 md:px-8 py-4 sm:py-6 max-w-7xl mx-auto w-full">
+      <div className="flex-1 px-3 sm:px-6 md:px-8 py-4 sm:py-6 max-w-[1600px] mx-auto w-full">
 
         {/* Results count */}
         {!loading && (
@@ -473,12 +606,25 @@ function BookmarksPageInner() {
                 <>
                   <span className="text-zinc-200 font-semibold">{total.toLocaleString()}</span>
                   {' '}bookmark{total !== 1 ? 's' : ''}
-                  {filters.q && <span className="text-zinc-600"> for &ldquo;{filters.q}&rdquo;</span>}
+                  {filters.q && <span className="text-zinc-500"> for &ldquo;{filters.q}&rdquo;</span>}
+                  {activeCategory && <span className="text-zinc-500"> in {activeCategory.name}</span>}
                 </>
               ) : (
                 'No bookmarks found'
               )}
             </p>
+            {filters.q && total > 0 && (
+              <span className="hidden sm:inline-flex items-center gap-1.5 text-xs text-zinc-500">
+                <Sparkles size={12} className="text-indigo-400" />
+                {filters.sort === 'best' ? 'Sorted by best match' : sortLabel}
+              </span>
+            )}
+          </div>
+        )}
+
+        {!loading && filters.q && matchMode === 'any' && total > 0 && (
+          <div className="mb-5 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-amber-200/90">
+            Nothing matched every word, so these are the closest matches (they contain some of your words).
           </div>
         )}
 
@@ -496,8 +642,10 @@ function BookmarksPageInner() {
               <BookmarkX size={26} className="text-zinc-700" />
             </div>
             <h3 className="text-base font-semibold text-zinc-400 mb-2">No bookmarks match your filters</h3>
-            <p className="text-zinc-600 text-sm mb-6 max-w-xs">
-              Try adjusting your search or removing some filters.
+            <p className="text-zinc-500 text-sm mb-6 max-w-sm">
+              Try fewer or different words. Tips: <span className="text-zinc-300">@handle</span> finds an author,
+              {' '}<span className="text-zinc-300">&quot;quotes&quot;</span> match an exact phrase,
+              {' '}<span className="text-zinc-300">-word</span> excludes a word.
             </p>
             {hasActiveFilters && (
               <button
@@ -513,13 +661,7 @@ function BookmarksPageInner() {
 
         {/* Masonry grid */}
         {!loading && bookmarks.length > 0 && viewMode === 'grid' && (
-          <div className="masonry-grid">
-            {bookmarks.map((bookmark) => (
-              <div key={bookmark.id} className="masonry-item">
-                <BookmarkCard bookmark={bookmark} />
-              </div>
-            ))}
-          </div>
+          <Masonry items={bookmarks} highlight={highlight} />
         )}
 
         {/* List view */}
@@ -527,7 +669,7 @@ function BookmarksPageInner() {
           <div className="flex flex-col gap-3 max-w-3xl mx-auto">
             {bookmarks.map((bookmark) => (
               <div key={bookmark.id} className="bookmark-virtual-item">
-                <BookmarkCard bookmark={bookmark} />
+                <BookmarkCard bookmark={bookmark} highlight={highlight} />
               </div>
             ))}
           </div>

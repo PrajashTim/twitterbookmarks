@@ -14,7 +14,6 @@ import {
   Sparkles,
   ChevronRight,
   Command,
-  Bookmark,
 } from 'lucide-react'
 
 interface NavItem {
@@ -39,35 +38,16 @@ const MOBILE_NAV_ITEMS: NavItem[] = [
   { href: '/mindmap', label: 'Mindmap', icon: GitBranch },
 ]
 
-const BUILDER_X = 'https://x.com/viperr'
-
-function SponsorFooter() {
+function SidebarFooter({ total }: { total: number | null }) {
   return (
-    <div className="mx-3 mt-auto mb-3 pt-3 border-t border-zinc-800/50 space-y-2">
-      {/* Builder credit */}
-      <a
-        href={BUILDER_X}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50 transition-all"
-      >
-        <span className="text-[13px]">&#x1D54F;</span>
-        <span className="text-[11px] font-medium">Built by @viperr</span>
-      </a>
-
-      {/* Sponsor spot */}
-      <a
-        href={BUILDER_X}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl bg-zinc-800/40 border border-zinc-700/30 hover:border-zinc-600/50 hover:bg-zinc-800/60 transition-all group"
-      >
-        <div className="w-7 h-7 rounded-full bg-zinc-700/50 border border-zinc-600/30 shrink-0" />
-        <div className="flex flex-col min-w-0">
-          <span className="text-[11px] font-medium text-zinc-400 group-hover:text-zinc-300 transition-colors leading-tight">Support Siftly by sponsoring your logo here</span>
-          <span className="text-[10px] text-zinc-600 leading-tight mt-1">DM @viperr on X</span>
-        </div>
-      </a>
+    <div className="mx-3 mt-auto mb-3 pt-3 border-t border-zinc-800/60">
+      <div className="flex items-center gap-2 px-2 py-1.5 text-[11px] text-zinc-500">
+        <span className="relative flex h-1.5 w-1.5">
+          <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60 animate-ping" />
+          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
+        </span>
+        {total !== null ? `${total.toLocaleString()} bookmarks · synced daily` : 'Synced daily from X'}
+      </div>
     </div>
   )
 }
@@ -158,7 +138,7 @@ export default function Nav() {
     return () => clearInterval(interval)
   }, [])
 
-  const visibleCats = showAllCats ? categories : categories.slice(0, 8)
+  const visibleCats = (showAllCats ? categories : categories.slice(0, 8)).filter((cat) => cat.bookmarkCount > 0)
 
   return (
     <>
@@ -181,7 +161,7 @@ export default function Nav() {
         </div>
       </header>
 
-      <aside className="hidden md:flex flex-col bg-zinc-900 border-r border-zinc-800/50 shrink-0 sticky top-0 h-screen overflow-y-auto" style={{ width: '228px' }}>
+      <aside className="hidden md:flex flex-col bg-zinc-950 border-r border-zinc-800/60 shrink-0 sticky top-0 h-screen overflow-y-auto" style={{ width: '228px' }}>
 
       {/* Brand */}
       <div className="flex items-center justify-center gap-3 px-4 py-3.5 border-b border-zinc-800/50">
@@ -238,8 +218,8 @@ export default function Nav() {
               href={href}
               className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-all ${
                 active
-                  ? 'bg-blue-500/12 text-blue-400'
-                  : 'text-zinc-500 hover:bg-zinc-800/70 hover:text-zinc-200'
+                  ? 'bg-zinc-800/80 text-zinc-100 shadow-[inset_2px_0_0_var(--color-indigo-500)]'
+                  : 'text-zinc-500 hover:bg-zinc-900 hover:text-zinc-200'
               }`}
             >
               <Icon size={14} className="shrink-0" />
@@ -293,10 +273,9 @@ export default function Nav() {
                           : 'text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200'
                       }`}
                     >
-                      <Bookmark
-                        size={12}
-                        className="flex-shrink-0 transition-colors"
-                        style={{ color: cat.color, fill: cat.color }}
+                      <span
+                        className="h-2 w-2 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: cat.color, boxShadow: `0 0 0 3px ${cat.color}22` }}
                       />
                       <span className="truncate flex-1">{cat.name}</span>
                       <span className="text-[11px] text-zinc-600 group-hover:text-zinc-500 tabular-nums font-normal">
@@ -324,7 +303,7 @@ export default function Nav() {
         </div>
       )}
 
-      <SponsorFooter />
+      <SidebarFooter total={totalBookmarks} />
       </aside>
 
       <nav className="md:hidden fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-zinc-800/80 bg-zinc-950/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl">

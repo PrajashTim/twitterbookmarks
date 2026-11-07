@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/db'
+import { avatarFromRaw } from '@/lib/avatar'
 
 export async function GET(): Promise<NextResponse> {
   try {
@@ -48,6 +49,7 @@ export async function GET(): Promise<NextResponse> {
 
     const formattedRecent = recentBookmarks.map((b) => ({
       id: b.id,
+      avatarUrl: avatarFromRaw(b.rawJson),
       tweetId: b.tweetId,
       text: b.text,
       authorHandle: b.authorHandle,

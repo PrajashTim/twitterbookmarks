@@ -22,6 +22,7 @@ export interface BookmarkWithMedia {
   authorName: string
   tweetCreatedAt: string | null
   importedAt?: string
+  avatarUrl?: string | null
   mediaItems: MediaItem[]
   categories: BookmarkCategory[]
 }
@@ -50,4 +51,6 @@ export interface BookmarksResponse {
   total: number
   page: number
   limit: number
+  matchMode?: 'all' | 'any'
+  highlight?: string[]
 }

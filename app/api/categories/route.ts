@@ -38,6 +38,12 @@ export async function GET(): Promise<NextResponse> {
       bookmarkCount: cat._count.bookmarks,
     }))
 
+    // Biggest collections first; the "General" catch-all always sits at the end.
+    formatted.sort((a, b) => {
+      if (a.slug === 'general' || b.slug === 'general') return a.slug === 'general' ? 1 : -1
+      return b.bookmarkCount - a.bookmarkCount || a.name.localeCompare(b.name)
+    })
+
     return NextResponse.json({ categories: formatted })
   } catch (err) {
     console.error('Categories fetch error:', err)

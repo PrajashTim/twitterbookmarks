@@ -48,14 +48,11 @@ function getInitials(name: string): string {
 
 // ── Avatar ───────────────────────────────────────────────────────────────────
 
-function MiniAvatar({ name, handle }: { name: string; handle: string }) {
+function MiniAvatar({ name, handle, avatarUrl }: { name: string; handle: string; avatarUrl?: string | null }) {
   const [imgFailed, setImgFailed] = useState(false)
   const bg = stringToColor(handle)
   const initials = getInitials(name)
-  const cleanHandle = handle.replace(/^@/, '')
-  const src = cleanHandle && cleanHandle !== 'unknown'
-    ? `https://unavatar.io/twitter/${cleanHandle}`
-    : null
+  const src = avatarUrl ?? null
 
   if (src && !imgFailed) {
     return (
@@ -142,7 +139,7 @@ export default function BookmarkRow({ bookmark, onClick }: BookmarkRowProps) {
     >
       {/* Avatar */}
       {isKnownAuthor ? (
-        <MiniAvatar name={bookmark.authorName} handle={bookmark.authorHandle} />
+        <MiniAvatar name={bookmark.authorName} handle={bookmark.authorHandle} avatarUrl={bookmark.avatarUrl} />
       ) : (
         <div className="shrink-0 w-6 h-6 rounded-full bg-zinc-700" />
       )}

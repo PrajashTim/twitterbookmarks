@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Tag, X, ArrowRight, Folder, Bookmark, Sparkles, Loader2, Check } from 'lucide-react'
+import { Plus, Tag, X, ArrowRight, Folder, Sparkles, Loader2, Check } from 'lucide-react'
 import * as Dialog from '@radix-ui/react-dialog'
 import Link from 'next/link'
 import type { Category } from '@/lib/types'
@@ -426,16 +426,16 @@ function CategoryDisplayCard({ category }: CategoryDisplayCardProps) {
           <p className="text-sm text-zinc-600 italic mb-4">No description</p>
         )}
 
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Bookmark size={14} style={{ color: category.color, fill: category.color }} className="shrink-0" />
-            <span className="text-3xl font-bold text-zinc-100">{category.bookmarkCount.toLocaleString()}</span>
+        <div className="flex items-end justify-between gap-3">
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-3xl font-semibold tracking-tight text-zinc-100 tabular-nums">{category.bookmarkCount.toLocaleString()}</span>
+            <span className="text-xs text-zinc-500">saved</span>
           </div>
           <Link
-            href={`/categories/${category.slug}`}
-            className="flex items-center gap-1.5 text-sm text-zinc-500 hover:text-indigo-400 transition-colors group-hover:text-zinc-400 font-medium"
+            href={`/bookmarks?category=${category.slug}`}
+            className="flex shrink-0 items-center gap-1 whitespace-nowrap text-xs text-zinc-500 hover:text-indigo-400 transition-colors group-hover:text-zinc-300 font-medium"
           >
-            View bookmarks
+            Browse
             <ArrowRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
           </Link>
         </div>

@@ -1,6 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { orderIdsBySeed, pickRandomOffset } from '@/lib/random'
+import { avatarFromRaw } from '@/lib/avatar'
+import { hasSearch, parseSearchQuery, scoreCandidates, sqlVariants, type SearchCandidate } from '@/lib/search'
+
+const BOOKMARK_INCLUDE = {
+  mediaItems: true,
+  categories: {
+    include: {
+      category: { select: { id: true, name: true, slug: true, color: true } },
+    },
+  },
+} as const
 
 const DEFAULT_PAGE = 1
 const DEFAULT_LIMIT = 24
@@ -53,9 +64,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     where.source = source
   }
 
-  if (q) {
-    where.text = { contains: q }
-  }
+  const parsed = parseSearchQuery(q)
+  const searching = hasSearch(parsed)
 
   if (uncategorized) {
     where.categories = { none: {} }
@@ -74,6 +84,17 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
+    if (searching && !random && sortParam !== 'random') {
+      return NextResponse.json(await runSearch(where, parsed, sortParam, skip, limit))
+    }
+
+    if (searching) {
+      // Random pick / shuffle within a search: use a simple superset filter.
+      where.AND = parsed.terms.map((term) => ({
+        OR: sqlVariants(term).flatMap((v) => [{ text: { contains: v } }, { authorHandle: { contains: v } }]),
+      }))
+    }
+
     if (random) {
       const total = await prisma.bookmark.count({ where })
       if (total === 0) {
@@ -190,6 +211,95 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 }
 
+type SearchFilter = Record<string, unknown>
+
+async function runSearch(
+  baseWhere: SearchFilter,
+  parsed: ReturnType<typeof parseSearchQuery>,
+  sortParam: string,
+  skip: number,
+  limit: number,
+) {
+  // SQL prefilter: a cheap superset (LIKE on stems + synonyms). Exact matching and
+  // ranking happen in JS so short words like "ai" don't match "said".
+  const termFilter = (term: string) => ({
+    OR: sqlVariants(term).flatMap((v) => [
+      { text: { contains: v } },
+      { authorName: { contains: v } },
+      { authorHandle: { contains: v } },
+      { semanticTags: { contains: v } },
+      { categories: { some: { category: { name: { contains: v } } } } },
+    ]),
+  })
+
+  const and: SearchFilter[] = []
+  for (const phrase of parsed.phrases) and.push({ text: { contains: phrase } })
+  if (parsed.authors.length > 0) {
+    and.push({ OR: parsed.authors.map((a) => ({ authorHandle: { contains: a } })) })
+  }
+
+  const select = {
+    id: true,
+    text: true,
+    authorName: true,
+    authorHandle: true,
+    semanticTags: true,
+    tweetCreatedAt: true,
+    importedAt: true,
+    categories: { select: { category: { select: { name: true } } } },
+  } as const
+
+  async function candidatesFor(mode: 'all' | 'any') {
+    const termClauses = parsed.terms.map(termFilter)
+    const where = {
+      ...baseWhere,
+      AND: [
+        ...and,
+        ...(termClauses.length === 0 ? [] : mode === 'all' ? termClauses : [{ OR: termClauses }]),
+      ],
+    }
+    const rows = await prisma.bookmark.findMany({ where, select })
+    const candidates: SearchCandidate[] = rows.map((row) => ({
+      ...row,
+      categoryNames: row.categories.map((c) => c.category.name),
+    }))
+    return scoreCandidates(candidates, parsed, mode)
+  }
+
+  let matchMode: 'all' | 'any' = 'all'
+  let scored = await candidatesFor('all')
+  if (scored.length === 0 && parsed.terms.length > 1) {
+    matchMode = 'any'
+    scored = await candidatesFor('any')
+  }
+
+  if (sortParam === 'newest' || sortParam === 'oldest') {
+    // Explicit date sort requested: keep matches, order by date.
+    const rows = await prisma.bookmark.findMany({
+      where: { id: { in: scored.map((s) => s.id) } },
+      select: { id: true, tweetCreatedAt: true, importedAt: true },
+    })
+    const dir = sortParam === 'oldest' ? 1 : -1
+    rows.sort((a, b) => dir * (((a.tweetCreatedAt ?? a.importedAt).getTime()) - ((b.tweetCreatedAt ?? b.importedAt).getTime())))
+    scored = rows.map((r) => ({ id: r.id, score: 0, matchedTerms: 0 }))
+  }
+
+  const pageIds = scored.slice(skip, skip + limit).map((s) => s.id)
+  const pageRows = pageIds.length === 0
+    ? []
+    : await prisma.bookmark.findMany({ where: { id: { in: pageIds } }, include: BOOKMARK_INCLUDE })
+  const byId = new Map(pageRows.map((row) => [row.id, row]))
+
+  return {
+    bookmarks: pageIds.map((id) => byId.get(id)).filter((b): b is NonNullable<typeof b> => Boolean(b)).map(formatBookmark),
+    total: scored.length,
+    page: Math.floor(skip / limit) + 1,
+    limit,
+    matchMode,
+    highlight: parsed.highlight,
+  }
+}
+
 interface BookmarkRecord {
   id: string
   tweetId: string
@@ -199,6 +309,7 @@ interface BookmarkRecord {
   source: string
   tweetCreatedAt: Date | null
   importedAt: Date
+  rawJson?: string
   mediaItems: { id: string; type: string; url: string; thumbnailUrl: string | null }[]
   categories: {
     confidence: number
@@ -208,6 +319,7 @@ interface BookmarkRecord {
 
 function formatBookmark(bookmark: BookmarkRecord) {
   return {
+    avatarUrl: avatarFromRaw(bookmark.rawJson),
     id: bookmark.id,
     tweetId: bookmark.tweetId,
     text: bookmark.text,

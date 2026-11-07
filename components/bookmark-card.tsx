@@ -3,6 +3,7 @@
 import React, { useRef, useEffect, useState } from 'react'
 import { ExternalLink, Download, FileText, Play, Pencil, X, Check, ImageOff, Bookmark, Globe, ChevronDown, ChevronUp } from 'lucide-react'
 import type { BookmarkWithMedia, Category } from '@/lib/types'
+import { buildHighlightRegex, highlightText } from '@/lib/highlight'
 
 // ── URL helpers ────────────────────────────────────────────────────────────────
 
@@ -251,9 +252,8 @@ function AuthorAvatar({ name, handle, avatarUrl }: { name: string; handle: strin
   const bg = stringToColor(handle)
   const initials = getInitials(name)
 
-  // Prefer stored avatar URL, fall back to unavatar.io for any Twitter handle
-  const cleanHandle = handle.replace(/^@/, '')
-  const src = avatarUrl ?? (cleanHandle && cleanHandle !== 'unknown' ? `https://unavatar.io/twitter/${cleanHandle}` : null)
+  // Profile photo comes from the stored tweet payload; initials otherwise.
+  const src = avatarUrl ?? null
 
   if (src && !imgFailed) {
     return (
@@ -261,7 +261,7 @@ function AuthorAvatar({ name, handle, avatarUrl }: { name: string; handle: strin
       <img
         src={src}
         alt={name}
-        className="flex-shrink-0 w-8 h-8 rounded-full object-cover select-none"
+        className="flex-shrink-0 w-9 h-9 rounded-full object-cover select-none ring-1 ring-zinc-800"
         loading="lazy"
         onError={() => setImgFailed(true)}
       />
@@ -270,7 +270,7 @@ function AuthorAvatar({ name, handle, avatarUrl }: { name: string; handle: strin
 
   return (
     <div
-      className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold select-none"
+      className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold select-none"
       style={{ backgroundColor: bg }}
       aria-hidden="true"
     >
@@ -416,19 +416,15 @@ function CategoryChip({
 }) {
   return (
     <span
-      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium"
       style={{
-        backgroundColor: `${category.color}18`,
+        backgroundColor: `${category.color}14`,
         color: category.color,
-        border: `1px solid ${category.color}30`,
+        border: `1px solid ${category.color}2e`,
       }}
     >
-      <Bookmark
-        size={9}
-        className="flex-shrink-0"
-        style={{ color: category.color, fill: category.color }}
-      />
-      {category.name}
+      <span className="h-1.5 w-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: category.color }} />
+      <a href={`/bookmarks?category=${category.slug}`} className="hover:underline underline-offset-2">{category.name}</a>
       {onRemove && (
         <button
           onClick={(e) => {
@@ -581,11 +577,12 @@ function CategoryEditor({ bookmarkId, currentCategoryIds, onSave, onClose }: Cat
 interface BookmarkCardProps {
   bookmark: BookmarkWithMedia
   defaultExpanded?: boolean
+  highlight?: string[]
 }
 
-export default function BookmarkCard({ bookmark, defaultExpanded = false }: BookmarkCardProps) {
+export default function BookmarkCard({ bookmark, defaultExpanded = false, highlight }: BookmarkCardProps) {
   const [categories, setCategories] = useState(bookmark.categories)
-  const [expanded, setExpanded] = useState(defaultExpanded)
+  const [toggled, setToggled] = useState<boolean | null>(null)
   const [editingCategories, setEditingCategories] = useState(false)
 
   const tweetUrl = (bookmark.authorHandle && bookmark.authorHandle !== 'unknown')
@@ -604,9 +601,17 @@ export default function BookmarkCard({ bookmark, defaultExpanded = false }: Book
 
   const TEXT_LIMIT = 280
   const isLong = cleanText.length > TEXT_LIMIT
-  const displayText = expanded || !isLong ? cleanText : cleanText.slice(0, TEXT_LIMIT)
 
   const currentCategoryIds = new Set(categories.map((c) => c.id))
+  const highlightRegex = React.useMemo(() => buildHighlightRegex(highlight), [highlight])
+  // When a search hit sits past the cut-off, open the card so the match is visible.
+  const hitBeyondCut = React.useMemo(() => {
+    if (!highlightRegex || !isLong) return false
+    const first = new RegExp(highlightRegex.source, 'iu').exec(cleanText)
+    return Boolean(first && first.index > TEXT_LIMIT - 20)
+  }, [highlightRegex, cleanText, isLong])
+  const expanded = toggled ?? (defaultExpanded || hitBeyondCut)
+  const displayText = expanded || !isLong ? cleanText : cleanText.slice(0, TEXT_LIMIT)
 
   function handleRemoveCategory(categoryId: string) {
     const newIds = categories.filter((c) => c.id !== categoryId).map((c) => c.id)
@@ -700,7 +705,7 @@ export default function BookmarkCard({ bookmark, defaultExpanded = false }: Book
     (firstMedia.type === 'photo' || isVideoUrl(firstMedia.url))
 
   return (
-    <div className="group relative bg-zinc-900 border border-zinc-800 rounded-2xl hover:border-zinc-700 hover:shadow-xl hover:shadow-black/30 transition-all duration-200 flex flex-col flex-1">
+    <div className="group relative bg-zinc-900 border border-zinc-800/80 rounded-2xl hover:border-zinc-700 hover:-translate-y-0.5 hover:shadow-[0_12px_32px_-12px_rgba(0,0,0,0.6)] transition-all duration-200 flex flex-col">
 
       {/* Top media — full bleed, no padding */}
       {firstMedia && (
@@ -716,7 +721,7 @@ export default function BookmarkCard({ bookmark, defaultExpanded = false }: Book
         <div className="flex items-start justify-between gap-2 mb-3">
           <div className="flex items-center gap-2.5 min-w-0">
             {isKnownAuthor && (
-              <AuthorAvatar name={bookmark.authorName} handle={bookmark.authorHandle} />
+              <AuthorAvatar name={bookmark.authorName} handle={bookmark.authorHandle} avatarUrl={bookmark.avatarUrl} />
             )}
             <div className="min-w-0">
               {isKnownAuthor && (
@@ -761,10 +766,10 @@ export default function BookmarkCard({ bookmark, defaultExpanded = false }: Book
         </div>
 
         {/* Tweet text */}
-        <div className={`flex-1 ${previewUrl && !displayText ? '' : 'min-h-[4.5rem]'}`}>
+        <div className="flex-1">
           {displayText.length > 0 && (
-            <p className="text-sm text-zinc-200 leading-relaxed whitespace-pre-wrap">
-              {displayText}
+            <p className="text-[14px] text-zinc-200 leading-[1.6] whitespace-pre-wrap break-words">
+              {highlightText(displayText, highlightRegex)}
               {isLong && !expanded ? '...' : ''}
             </p>
           )}
@@ -772,8 +777,8 @@ export default function BookmarkCard({ bookmark, defaultExpanded = false }: Book
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <button
                 type="button"
-                onClick={() => setExpanded((value) => !value)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-1.5 text-xs font-semibold text-cyan-300 hover:border-cyan-400/60 hover:bg-cyan-500/15 transition-colors"
+                onClick={() => setToggled(!expanded)}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-400 hover:text-indigo-300 transition-colors"
                 aria-expanded={expanded}
               >
                 {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
@@ -800,7 +805,7 @@ export default function BookmarkCard({ bookmark, defaultExpanded = false }: Book
         </div>
 
         {/* Footer: categories + meta — fixed two-row structure keeps all cards aligned */}
-        <div className="relative mt-auto pt-3 border-t border-zinc-800/50">
+        <div className="relative mt-4 pt-3 border-t border-zinc-800/60">
           {/* Row 1: chips + date — consistent height across all cards */}
           <div className="flex items-center gap-1.5 flex-wrap min-h-[1.5rem]">
             {categories.map((cat) => (
@@ -816,8 +821,8 @@ export default function BookmarkCard({ bookmark, defaultExpanded = false }: Book
             )}
           </div>
 
-          {/* Row 2: edit button — always in DOM to reserve space; invisible until hover */}
-          <div className="mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          {/* Row 2: edit button — only on hover, collapsed otherwise */}
+          <div className="hidden group-hover:block mt-1.5">
             <button
               onClick={() => setEditingCategories((v) => !v)}
               className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs text-zinc-700 hover:text-zinc-300 hover:bg-zinc-800 border border-transparent hover:border-zinc-700 transition-all"

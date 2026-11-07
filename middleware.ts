@@ -18,7 +18,7 @@ export function middleware(request: NextRequest): NextResponse {
     const pathname = request.nextUrl.pathname
     const syncToken = process.env.BOOKMARK_SYNC_TOKEN
     const syncRequest =
-      pathname === '/api/sync/bookmarks' &&
+      (pathname === '/api/sync/bookmarks' || pathname === '/api/sync/reclassify') &&
       syncToken &&
       request.headers.get('Authorization') === `Bearer ${syncToken}`
 

@@ -1,7 +1,7 @@
 import { timingSafeEqual } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/db'
-import { classifyBookmark } from '@/lib/bookmark-classifier'
+import { classificationTextFor, classifyBookmark } from '@/lib/bookmark-classifier'
 import { extractMedia, tweetFullText, type TweetResult } from '@/lib/twitter-api'
 
 const MAX_TWEETS_PER_REQUEST = 100
@@ -48,7 +48,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const fullText = tweetFullText(tweet).trim()
     const user = tweet.core?.user_results?.result?.legacy ?? {}
-    const classificationText = `${fullText}\n${user.name ?? ''}\n${user.screen_name ?? ''}`
+    const classificationText = classificationTextFor({
+      text: fullText,
+      authorName: user.name,
+      authorHandle: user.screen_name,
+      rawJson: JSON.stringify(tweet),
+    })
     const matches = classifyBookmark(classificationText)
       .map((match) => ({ ...match, categoryId: categoryBySlug.get(match.slug) }))
       .filter((match): match is typeof match & { categoryId: string } => Boolean(match.categoryId))
